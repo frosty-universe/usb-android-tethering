@@ -121,6 +121,9 @@ pub fn install(ifname: &str, first: bool) -> Result<()> {
          d.init\n\
          d.add ConfigMethod DHCP\n\
          set /NetworkServices/{id}/IPv4\n\
+         d.init\n\
+         d.add FTPPassive # 1\n\
+         set /NetworkServices/{id}/Proxies\n\
          set {set}/Network/Service/{id} /NetworkServices/{id}\n\
          {order}\
          commit\n\
