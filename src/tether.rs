@@ -244,7 +244,11 @@ fn session(found: &usbnet::Found, opts: &Options) -> Result<()> {
     let mut nic_thread = None;
     let mut service_created = false;
     let result = (|| -> Result<()> {
-        state::write(state::Phase::Connecting, Some(found), None, None, None);
+        // `probe` must never write the status file: the background service may be online, and
+        // probe would otherwise replace its status with its own.
+        if !opts.probe {
+            state::write(state::Phase::Connecting, Some(found), None, None, None);
+        }
         // Readiness check: the phone's DHCP server answers, so its tethering stack is up.
         let lease = dhcp::acquire(&link, &dhcp_rx)?;
         let summary = format!(
@@ -344,9 +348,10 @@ fn session(found: &usbnet::Found, opts: &Options) -> Result<()> {
             }
             if last_net.elapsed() >= Duration::from_secs(30) {
                 last_net = Instant::now();
+                let now_info = netservice::info();
                 // Self-heal: the address was lost or degraded to link-local (e.g. a lease
                 // renewal failed while the phone was busy). Restart DHCP now.
-                if netservice::info().is_none() {
+                if now_info.is_none() {
                     warn!("lost the address from the phone; restarting DHCP");
                     if let Err(e) = nic.bounce() {
                         warn!("could not restart DHCP: {e:#}");
@@ -364,7 +369,7 @@ fn session(found: &usbnet::Found, opts: &Options) -> Result<()> {
                         service_created = true;
                     }
                 }
-                info = netservice::info();
+                info = now_info;
                 let now_primary = netservice::primary_interface();
                 if now_primary != primary {
                     info!(
@@ -374,8 +379,14 @@ fn session(found: &usbnet::Found, opts: &Options) -> Result<()> {
                     primary = now_primary;
                 }
             }
+            // No address means the link is not usable: report connecting, not online, so
+            // `status` never shows an online tether with a blank address.
             state::write(
-                state::Phase::Online,
+                if info.is_some() {
+                    state::Phase::Online
+                } else {
+                    state::Phase::Connecting
+                },
                 Some(found),
                 Some(&nic.host),
                 info.as_ref(),
@@ -429,7 +440,7 @@ pub fn cleanup_leftovers() -> bool {
     feth::remove_stale() | removed_service
 }
 
-/// Tries adb on phones whose tethering is off (at most every 30 s per phone).
+/// Tries adb on phones whose tethering is off (at most every 20 s per phone).
 fn try_adb(hints: &[usbnet::Hint], tried: &mut HashMap<String, (Instant, u32)>) {
     for h in hints {
         let usbnet::Hint::TetheringOff {
@@ -484,7 +495,9 @@ pub fn run(opts: &Options) -> bool {
     let mut announced_wait = false;
     let mut ok = true;
     let mut failures = 0u32;
-    state::write(state::Phase::Waiting, None, None, None, None);
+    if !opts.probe {
+        state::write(state::Phase::Waiting, None, None, None, None);
+    }
     while !STOP.load(Ordering::Relaxed) {
         let found = match usbnet::find_all() {
             Ok(mut v) if !v.is_empty() => v.swap_remove(0),
@@ -526,7 +539,9 @@ pub fn run(opts: &Options) -> bool {
         announced_wait = false;
         info!("found phone {}", found.describe());
         let r = session(&found, opts);
-        state::write(state::Phase::Waiting, None, None, None, None);
+        if !opts.probe {
+            state::write(state::Phase::Waiting, None, None, None, None);
+        }
         match &r {
             Ok(()) if STOP.load(Ordering::Relaxed) || opts.probe => {}
             Ok(()) => info!("phone disconnected; back on your other networks"),
@@ -557,7 +572,7 @@ pub fn run(opts: &Options) -> bool {
         seen = usbio::change_count();
         usbio::wait_for_change(&mut seen, delay);
     }
-    state::clear();
+    state::clear(); // pid-guarded: never removes another instance's status
     ok
 }
 

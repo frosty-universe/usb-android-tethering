@@ -33,6 +33,15 @@ This downloads the latest universal binary (Apple Silicon and Intel), **verifies
 
 <sub>Prefer to read the script first? It's short: <a href="install.sh"><code>install.sh</code></a>. Or <a href="#build-from-source">build from source</a>.</sub>
 
+### With Homebrew
+
+```sh
+brew install frosty-universe/usb-android-tethering/usb-android-tethering
+sudo usb-android-tethering install
+```
+
+The formula builds from the tagged source with your Rust toolchain, so `brew upgrade` picks up every new release. It is a tap formula, not in homebrew-core, so the fully qualified name is needed the first time.
+
 ---
 
 ## 🤔 Why this exists
@@ -97,7 +106,7 @@ Phone:              04e8:6863 "SAMSUNG_Android" RNDIS (bus 0 addr 2, ctrl if 0, 
 curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh
 ```
 
-You need macOS on Apple Silicon or Intel and your password once. The service then starts automatically at every boot.
+You need a Mac running macOS 11 or later (Apple silicon or Intel, see [Mac compatibility](#mac-compatibility)) and your password once. The service then starts automatically at every boot.
 
 <a id="step-2"></a>
 ### Step 2 — Turn on USB tethering on the phone
@@ -186,14 +195,18 @@ The universal binary runs natively on both architectures. There is no Apple-sili
 
 ## 📱 Device support
 
-| Phone | Handled by |
-|---|---|
-| Android with **RNDIS**: Samsung, Xiaomi, OnePlus, OPPO/realme, vivo, Huawei/Honor, Motorola, Sony, LG, Nokia/HMD, ASUS, ZTE, Lenovo, Fairphone and others | **This tool** (verified on Samsung) |
-| Android with **CDC-NCM** (Pixel 6+, newer phones) | macOS's built-in driver if it claims the phone, otherwise **this tool** |
-| Devices with **CDC-ECM** | macOS's built-in driver if it claims it, otherwise **this tool** |
-| iPhone / iPad | Built into macOS (Personal Hotspot); `devices` tells you so |
+Detection is by USB interface class, not a model list, so a phone doesn't have to be on a list to work.
 
-`usb-android-tethering devices` shows what's attached and what to do about each device. The NCM/ECM userspace path is covered by unit tests but hasn't yet been verified on a phone that macOS doesn't claim. **[Device reports](https://github.com/frosty-universe/usb-android-tethering/issues/new/choose) are very welcome.**
+| Phone | Handled by | Status |
+|---|---|---|
+| Android with **RNDIS**: Samsung, Xiaomi, OnePlus, OPPO/realme, vivo, Huawei/Honor, Motorola, Sony, LG, Nokia/HMD, ASUS, ZTE, Lenovo, Fairphone and others | **This tool** | Verified end to end on Samsung (Galaxy J7, Android) |
+| Android with **CDC-NCM** (Pixel 6 and later, newer phones) | macOS's built-in driver if it claims the phone, otherwise **this tool** | Native path works on macOS; the userspace fallback is unit-tested only |
+| Devices with **CDC-ECM** | macOS's built-in driver if it claims it, otherwise **this tool** | Unit-tested only |
+| iPhone / iPad | macOS Personal Hotspot | Built into macOS; `devices` identifies it |
+
+The **NCM/ECM userspace fallback has not been tested on hardware**, because no phone that macOS declines to claim was available. If yours is one, [open a device report](https://github.com/frosty-universe/usb-android-tethering/issues/new/choose) with the output of `usb-android-tethering devices --json` and the connection log.
+
+`usb-android-tethering devices` lists what's attached and what to do about each device, including phones whose tethering is switched off and phones macOS already handles.
 
 ## 🧭 Commands
 
@@ -293,6 +306,9 @@ sudo ./target/release/usb-android-tethering install
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data path, protocols, threading, invariants, design decisions |
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Methodology, measurements, reproducible benchmark |
+| [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Phones, protocols, macOS versions, VPN clients |
+| [docs/HOMEBREW.md](docs/HOMEBREW.md) | Installing and upgrading with Homebrew |
+| [docs/FAQ.md](docs/FAQ.md) | Common problems and fixes |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, hardware testing, standards |
 | [SECURITY.md](SECURITY.md) | Security model and private vulnerability reporting |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |

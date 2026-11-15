@@ -95,9 +95,8 @@ impl Params {
         frame: impl Fn(usize) -> &'a [u8],
         out: &mut [u8],
     ) -> (usize, usize) {
-        // `soft`: the phone's limit when aggregating; `hard`: the buffer, for a lone frame.
         // One spare byte keeps the transfer off a max-packet boundary (no zero-length packet).
-        let hard = out.len() - 1;
+        // `soft` is the smaller of the phone's NTB limit and the buffer.
         let soft = self.out_max.min(out.len()) - 1;
         let mut entries = [(0usize, 0usize); MAX_DATAGRAMS];
         let (mut pos, mut n) = (NTH16_LEN, 0);
@@ -112,7 +111,7 @@ impl Params {
             if n > 0 && (n == self.out_max_datagrams || total > soft) {
                 break;
             }
-            if total > hard {
+            if total > soft {
                 return (0, 1);
             }
             out[pos..start].fill(0);
@@ -182,10 +181,12 @@ pub fn parse_ntb(buf: &[u8], mut on_frame: impl FnMut(&[u8])) {
             }
             e += 4;
         }
-        ndp = le16(buf, ndp + 6);
-        if ndp == 0 {
+        let next = le16(buf, ndp + 6);
+        // Only forward links are legal; a backwards or self link would replay datagrams.
+        if next <= ndp {
             return;
         }
+        ndp = next;
     }
 }
 
@@ -276,6 +277,77 @@ mod tests {
     }
 
     #[test]
+    fn parse_follows_forward_ndp_chain() {
+        // Two NDPs, one datagram each: both frames arrive, and the chain stops at a null link.
+        let mut b = vec![0u8; 80];
+        b[0..4].copy_from_slice(&NTH16_SIG.to_le_bytes());
+        put16(&mut b, 8, 80);
+        put16(&mut b, 10, 12);
+        for (ndp, next, idx) in [(12, 32, 48), (32, 0, 64)] {
+            b[ndp..ndp + 4].copy_from_slice(&NDP16_SIG.to_le_bytes());
+            put16(&mut b, ndp + 4, 16);
+            put16(&mut b, ndp + 6, next);
+            put16(&mut b, ndp + 8, idx);
+            put16(&mut b, ndp + 10, 8);
+            b[idx..idx + 8].fill(ndp as u8);
+        }
+        let mut got = Vec::new();
+        parse_ntb(&b, |f| got.push(f.to_vec()));
+        assert_eq!(got, vec![vec![12u8; 8], vec![32u8; 8]]);
+        // A backwards link closes the chain after the NDP it reuses was already consumed.
+        put16(&mut b, 38, 12);
+        got.clear();
+        parse_ntb(&b, |f| got.push(f.to_vec()));
+        assert_eq!(got, vec![vec![12u8; 8], vec![32u8; 8]]);
+    }
+
+    #[test]
+    fn parse_strips_crc_and_skips_bad_datagrams() {
+        let mut b = vec![0u8; 48];
+        b[0..4].copy_from_slice(&NTH16_SIG.to_le_bytes());
+        put16(&mut b, 8, 48);
+        put16(&mut b, 10, 12);
+        b[12..16].copy_from_slice(&NDP16_SIG_CRC.to_le_bytes());
+        put16(&mut b, 16, 16);
+        put16(&mut b, 20, 40);
+        put16(&mut b, 22, 8); // 4 bytes payload + 4-byte CRC
+        b[40..48].copy_from_slice(b"abcdCRC!");
+        let mut got = Vec::new();
+        parse_ntb(&b, |f| got.push(f.to_vec()));
+        assert_eq!(got, vec![b"abcd".to_vec()]);
+        // Length equal to the CRC alone leaves no payload.
+        put16(&mut b, 22, 4);
+        got.clear();
+        parse_ntb(&b, |f| got.push(f.to_vec()));
+        assert!(got.is_empty());
+        // Datagram running past wBlockLength is skipped, not sliced.
+        put16(&mut b, 22, 0xffff);
+        got.clear();
+        parse_ntb(&b, |f| got.push(f.to_vec()));
+        assert!(got.is_empty());
+    }
+
+    #[test]
+    fn pack_respects_out_max_smaller_than_buffer() {
+        let p = Params {
+            out_max: 1600,
+            ..params()
+        };
+        let mut out = vec![0u8; p.tx_buf_len()];
+        assert!(out.len() > p.out_max);
+        let ok = vec![0u8; 1400];
+        let (n, used) = p.pack_with(1, |_| &ok, &mut out);
+        assert_eq!(used, 1);
+        assert!(n <= p.out_max);
+        let big = vec![0u8; 1600];
+        assert_eq!(
+            p.pack_with(1, |_| &big, &mut out),
+            (0, 1),
+            "over wNtbOutMaxSize"
+        );
+    }
+
+    #[test]
     fn parse_rejects_garbage_and_loops() {
         let mut calls = 0;
         parse_ntb(&[0xff; 64], |_| calls += 1);
@@ -291,5 +363,31 @@ mod tests {
         put16(&mut b, 18, 12); // next NDP = itself
         parse_ntb(&b, |_| calls += 1);
         assert_eq!(calls, 0);
+    }
+
+    #[test]
+    fn parse_survives_hostile_ntbs() {
+        let mut calls = 0;
+        // wBlockLength far beyond the transfer, then NDP entries beyond the block.
+        let mut b = vec![0u8; 40];
+        b[0..4].copy_from_slice(&NTH16_SIG.to_le_bytes());
+        put16(&mut b, 8, 0xffff);
+        put16(&mut b, 10, 12);
+        parse_ntb(&b, |_| calls += 1);
+        b[12..16].copy_from_slice(&NDP16_SIG.to_le_bytes());
+        put16(&mut b, 16, 0xffff); // NDP length beyond the block
+        put16(&mut b, 20, 0xfff0); // datagram offset beyond the block
+        put16(&mut b, 22, 0xfff0); // datagram length beyond the block
+        parse_ntb(&b, |_| calls += 1);
+        assert_eq!(calls, 0);
+
+        // Every truncation of a valid block parses and yields only in-bounds frames.
+        let p = params();
+        let frame = vec![9u8; 100];
+        let mut out = vec![0u8; p.tx_buf_len()];
+        let (n, _) = p.pack_with(1, |_| &frame, &mut out);
+        for cut in 0..=n {
+            parse_ntb(&out[..cut], |f| assert!(f.len() <= cut));
+        }
     }
 }

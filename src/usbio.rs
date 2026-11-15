@@ -49,7 +49,13 @@ pub fn start() -> bool {
             .spawn(|| {
                 loop {
                     // Blocks until a completion or hotplug event; the timeout is only a backstop.
-                    let _ = GlobalContext::default().handle_events(Some(Duration::from_secs(60)));
+                    if GlobalContext::default()
+                        .handle_events(Some(Duration::from_secs(60)))
+                        .is_err()
+                    {
+                        // An error returns at once; without a pause this would spin a core.
+                        std::thread::sleep(Duration::from_millis(100));
+                    }
                 }
             })
             .map_err(|e| log::error!("cannot start USB event thread: {e}"))
@@ -96,15 +102,33 @@ fn status_name(s: i32) -> &'static str {
     }
 }
 
-/// Allocates `count` bulk transfers with `size`-byte buffers on `ep`.
+/// Rejects a transfer geometry libusb cannot express (`length` is an `i32`).
+fn check_geometry(count: usize, size: usize) -> Result<()> {
+    anyhow::ensure!(
+        count > 0 && size > 0 && size <= i32::MAX as usize,
+        "invalid transfer geometry ({count} × {size} bytes)"
+    );
+    Ok(())
+}
+
+/// Receive transfers give up after this long. Without a timeout a phone that stops sending
+/// leaves every transfer queued forever: no completion, no error, and no resubmission, so a
+/// wedged endpoint is never recovered. The timeout only bounds how long that goes unnoticed.
+/// Generous, because an idle link legitimately sends nothing for many seconds; libusb reports
+/// `LIBUSB_TRANSFER_TIMED_OUT`, which [`rx_done`] treats as idle and requeues.
+const RX_TIMEOUT_MS: u32 = 30_000;
+
+/// Allocates `count` bulk transfers with `size`-byte buffers on `ep`. `timeout_ms` 0 = forever.
 unsafe fn alloc(
     handle: *mut ffi::libusb_device_handle,
     ep: u8,
     count: usize,
     size: usize,
+    timeout_ms: u32,
     cb: ffi::libusb_transfer_cb_fn,
     user_data: *mut c_void,
 ) -> Result<Transfers> {
+    check_geometry(count, size)?;
     let mut ts = Vec::with_capacity(count);
     let mut bufs = Vec::with_capacity(count);
     for _ in 0..count {
@@ -119,7 +143,7 @@ unsafe fn alloc(
             (*t).dev_handle = handle;
             (*t).endpoint = ep;
             (*t).transfer_type = LIBUSB_TRANSFER_TYPE_BULK;
-            (*t).timeout = 0;
+            (*t).timeout = timeout_ms;
             (*t).flags = 0;
             (*t).length = size as i32;
             (*t).buffer = buf.as_mut_ptr();
@@ -133,19 +157,27 @@ unsafe fn alloc(
     Ok((ts, bufs))
 }
 
+/// Bytes to read out of a completed transfer. Clamped to the buffer: a slice past it is UB.
+fn rx_len(actual: i32, capacity: i32) -> usize {
+    actual.clamp(0, capacity.max(0)) as usize
+}
+
 /// Cancels everything and waits for all callbacks. Returns false if they did not all finish.
 fn drain(ts: &[*mut ffi::libusb_transfer], inflight: &AtomicUsize) -> bool {
-    for &t in ts {
-        unsafe { ffi::libusb_cancel_transfer(t) }; // NOT_FOUND for idle ones is fine
-    }
     let deadline = Instant::now() + Duration::from_secs(3);
-    while inflight.load(Ordering::Acquire) > 0 {
+    loop {
+        // Repeat the cancel: a receive callback can resubmit just after a single pass.
+        for &t in ts {
+            unsafe { ffi::libusb_cancel_transfer(t) }; // NOT_FOUND for idle ones is fine
+        }
+        if inflight.load(Ordering::Acquire) == 0 {
+            return true;
+        }
         if Instant::now() > deadline {
             return false;
         }
         std::thread::sleep(Duration::from_millis(2));
     }
-    true
 }
 
 struct RxShared {
@@ -166,25 +198,60 @@ pub struct RxRing {
 // The raw transfer pointers are only touched by libusb and by Drop after draining.
 unsafe impl Send for RxRing {}
 
+/// What a completed receive transfer means for the ring.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RxOutcome {
+    /// Data (possibly none) arrived; deliver it and requeue.
+    Data,
+    /// Nothing usable but the link is fine (cancelled, oversized burst): drop and requeue.
+    Requeue,
+    /// A real error: report it and stop.
+    Fail,
+}
+
+fn rx_outcome(status: i32) -> RxOutcome {
+    match status {
+        LIBUSB_TRANSFER_COMPLETED => RxOutcome::Data,
+        // An idle link: the transfer expired with the phone silent. Requeue it, which is what
+        // recovers a stalled endpoint. Any bytes that did arrive are dropped; RNDIS is
+        // packet-framed and the parser discards a truncated tail, so nothing usable is lost.
+        LIBUSB_TRANSFER_TIMED_OUT => RxOutcome::Requeue,
+        LIBUSB_TRANSFER_CANCELLED | LIBUSB_TRANSFER_OVERFLOW => RxOutcome::Requeue,
+        _ => RxOutcome::Fail,
+    }
+}
+
 extern "system" fn rx_done(t: *mut ffi::libusb_transfer) {
     unsafe {
         let sh = &*((*t).user_data as *const RxShared);
-        match (*t).status {
-            LIBUSB_TRANSFER_COMPLETED => {
-                let data =
-                    std::slice::from_raw_parts((*t).buffer, (*t).actual_length.max(0) as usize);
+        match rx_outcome((*t).status) {
+            RxOutcome::Data => {
+                let data = std::slice::from_raw_parts(
+                    (*t).buffer,
+                    rx_len((*t).actual_length, (*t).length),
+                );
                 (sh.on_data)(data);
             }
-            // Cancelled: we're stopping. Overflow: a bigger-than-announced burst; drop it.
-            LIBUSB_TRANSFER_CANCELLED | LIBUSB_TRANSFER_OVERFLOW => {}
-            s => {
+            RxOutcome::Requeue => {}
+            RxOutcome::Fail => {
                 if !sh.stopping.swap(true, Ordering::AcqRel) {
-                    (sh.on_fatal)(status_name(s));
+                    (sh.on_fatal)(status_name((*t).status));
                 }
             }
         }
-        if !sh.stopping.load(Ordering::Acquire) && ffi::libusb_submit_transfer(t) == 0 {
-            return; // still in flight
+        if !sh.stopping.load(Ordering::Acquire) {
+            let rc = ffi::libusb_submit_transfer(t);
+            if rc == 0 {
+                return; // still in flight
+            }
+            // A transfer the ring cannot requeue is one it never gets back: without this the
+            // ring shrinks one buffer at a time until nothing is listening, and the link still
+            // looks alive.
+            if !sh.stopping.swap(true, Ordering::AcqRel) {
+                (sh.on_fatal)(&format!(
+                    "cannot requeue USB receive transfer (libusb error {rc})"
+                ));
+            }
         }
         sh.inflight.fetch_sub(1, Ordering::AcqRel);
     }
@@ -207,17 +274,20 @@ impl RxRing {
             on_fatal: Box::new(on_fatal),
         });
         let ud = Arc::as_ptr(&shared) as *mut c_void;
-        let (ts, bufs) = unsafe { alloc(handle, ep, count, size, rx_done, ud)? };
-        let ring = RxRing { shared, ts, bufs };
-        for &t in &ring.ts {
-            ring.shared.inflight.fetch_add(1, Ordering::AcqRel);
+        let (ts, bufs) = unsafe { alloc(handle, ep, count, size, RX_TIMEOUT_MS, rx_done, ud)? };
+        for (i, &t) in ts.iter().enumerate() {
+            shared.inflight.fetch_add(1, Ordering::AcqRel);
             let rc = unsafe { ffi::libusb_submit_transfer(t) };
             if rc != 0 {
-                ring.shared.inflight.fetch_sub(1, Ordering::AcqRel);
-                bail!("cannot queue USB receive transfer (libusb error {rc})");
+                shared.inflight.fetch_sub(1, Ordering::AcqRel);
+                // Hand the ring to Drop so the transfers already submitted are cancelled and
+                // every allocation (transfers and buffers) is released.
+                let ring = RxRing { shared, ts, bufs };
+                drop(ring);
+                bail!("cannot queue USB receive transfer (libusb error {rc}, after {i} queued)");
             }
         }
-        Ok(ring)
+        Ok(RxRing { shared, ts, bufs })
     }
 }
 
@@ -292,7 +362,7 @@ impl TxPool {
             on_fatal: Box::new(on_fatal),
         });
         let ud = Arc::as_ptr(&shared) as *mut c_void;
-        let (ts, bufs) = unsafe { alloc(handle, ep, count, size, tx_done, ud)? };
+        let (ts, bufs) = unsafe { alloc(handle, ep, count, size, 0, tx_done, ud)? };
         for &t in &ts {
             let _ = tx.send(t as usize);
         }
@@ -355,5 +425,69 @@ impl Drop for TxPool {
             std::mem::forget(std::mem::take(&mut self.bufs));
             std::mem::forget(self.shared.clone());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rx_len_never_exceeds_the_buffer() {
+        assert_eq!(rx_len(0, 1024), 0);
+        assert_eq!(rx_len(512, 1024), 512);
+        assert_eq!(rx_len(1024, 1024), 1024);
+        assert_eq!(rx_len(1025, 1024), 1024, "over-report must be clamped");
+        assert_eq!(rx_len(i32::MAX, 1024), 1024);
+        assert_eq!(rx_len(-1, 1024), 0);
+        assert_eq!(rx_len(8, -1), 0);
+    }
+
+    #[test]
+    fn geometry_rejects_what_libusb_cannot_express() {
+        assert!(check_geometry(8, 16384).is_ok());
+        assert!(check_geometry(0, 16384).is_err());
+        assert!(check_geometry(8, 0).is_err());
+        assert!(check_geometry(1, i32::MAX as usize).is_ok());
+        assert!(check_geometry(1, i32::MAX as usize + 1).is_err());
+    }
+
+    #[test]
+    fn rx_outcome_requeues_on_an_idle_link() {
+        // A phone that goes quiet must not kill the ring: the transfer is requeued.
+        assert_eq!(rx_outcome(LIBUSB_TRANSFER_TIMED_OUT), RxOutcome::Requeue);
+        assert_eq!(rx_outcome(LIBUSB_TRANSFER_CANCELLED), RxOutcome::Requeue);
+        assert_eq!(rx_outcome(LIBUSB_TRANSFER_OVERFLOW), RxOutcome::Requeue);
+        assert_eq!(rx_outcome(LIBUSB_TRANSFER_COMPLETED), RxOutcome::Data);
+        assert_eq!(rx_outcome(LIBUSB_TRANSFER_NO_DEVICE), RxOutcome::Fail);
+        assert_eq!(rx_outcome(LIBUSB_TRANSFER_STALL), RxOutcome::Fail);
+        assert_eq!(rx_outcome(LIBUSB_TRANSFER_ERROR), RxOutcome::Fail);
+    }
+
+    #[test]
+    fn wait_for_change_returns_early_on_wake() {
+        let mut seen = change_count();
+        let before = Instant::now();
+        let woken = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            wake();
+            wake();
+        });
+        wait_for_change(&mut seen, Duration::from_secs(10));
+        woken.join().unwrap();
+        assert!(
+            before.elapsed() < Duration::from_secs(5),
+            "did not wake early"
+        );
+        assert_eq!(seen, change_count());
+    }
+
+    #[test]
+    fn wait_for_change_times_out_without_a_change() {
+        let mut seen = change_count();
+        let before = Instant::now();
+        wait_for_change(&mut seen, Duration::from_millis(20));
+        assert!(before.elapsed() >= Duration::from_millis(20));
+        assert_eq!(seen, change_count());
     }
 }

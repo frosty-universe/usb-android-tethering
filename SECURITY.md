@@ -31,6 +31,7 @@ You can expect an acknowledgement within **5 days** and a first assessment withi
 | USB data from the phone (RNDIS messages, NCM transfer blocks, CDC descriptors, serial number) | **Untrusted** | All parsing is bounds-checked, never panics on malformed input, and bounds pointer chains such as NCM's NDP list (covered by unit tests). The serial number is only passed to `adb` as a separate argument, never through a shell. |
 | Frames from macOS on the virtual NIC | Trusted (local kernel) | Filtered in the kernel to IPv4 and ARP |
 | Command-line arguments | Local user | Parsed by clap. Commands that change the system require root. |
+| Values read from macOS and pasted into `scutil` scripts (network location path, interface name) | Semi-trusted (system configuration) | Validated against a fixed character set and refused outright if they don't match, rather than escaped. The service name is quoted, with `"` and `\` escaped. `scutil` failures are detected from its own output because it exits 0 on some errors. |
 | `adb` binary (optional) | **User-writable location** | Never executed as root. It runs as the logged-in console user, only if owned by root or that user and not group- or world-writable. |
 
 ### What runs as root, and why
@@ -43,14 +44,20 @@ You can expect an acknowledgement within **5 days** and a first assessment withi
 
 The daemon opens **no network sockets** and listens on nothing. It exchanges frames only with the phone (USB) and the local kernel (BPF).
 
+### Installer
+
+`install.sh` downloads the release archive and `SHA256SUMS` from the same GitHub release, verifies the archive's SHA-256, extracts only the binary, runs it once with `--version` to prove it executes on this Mac, and only then calls `sudo install`. Any failed step aborts before anything is installed. The archive is not signed by Apple; the checksum only protects against a corrupted or mismatched download, not against a compromised release.
+
 ### Files
 
 | Path | Owner / mode | Notes |
 |---|---|---|
-| `/usr/local/bin/usb-android-tethering` | `root:wheel 0755` | Enforced by `install`, so no other user can replace code that runs as root |
-| `/Library/LaunchDaemons/com.usb-android-tethering.plist` | `root:wheel 0644` | |
-| `/var/run/usb-android-tethering.json` | root, world-readable | Status only (addresses, counters). No secrets. Replaced atomically. |
-| `/var/log/usb-android-tethering.log` | root | Contains no traffic contents |
+| `/usr/local/bin/usb-android-tethering` | `root:wheel 0755` | Set explicitly before the binary is renamed into place, so no other user can replace code that runs as root. The installer also refuses to install into a directory that is not root-owned or that is group- or world-writable. |
+| `/Library/LaunchDaemons/com.usb-android-tethering.plist` | root, `0644` (process umask) | Written by the installer running as root. |
+| `/var/run/usb-android-tethering.json` | root, `0644` (process umask) | Status only (addresses, counters). No secrets. Replaced atomically. |
+| `/var/log/usb-android-tethering.log` | root, `0644` (process umask) | Contains no traffic contents. Rotated to `.log.1` at 5 MB. |
+
+The two `0644` entries are ordinary files created by a root process with the default umask, not modes the code sets explicitly. If you run the daemon with a restrictive umask they will be more restrictive, never less.
 
 ### Network exposure
 

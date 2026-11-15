@@ -83,6 +83,14 @@ impl RunArgs {
     }
 }
 
+/// `run --once --no-adb`, for the sudo hint after a root check fails.
+fn command_line(sub: &str, a: &RunArgs) -> String {
+    std::iter::once(sub.to_string())
+        .chain(a.to_args())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[derive(Subcommand)]
 enum Cmd {
     /// Connect now and keep reconnecting; the default command (requires root)
@@ -123,6 +131,10 @@ fn require_root(what: &str) -> bool {
     false
 }
 
+fn verbosity(quiet: bool, verbose: u8) -> i8 {
+    if quiet { -1 } else { verbose.min(2) as i8 }
+}
+
 fn install_signal_handler() {
     if let Err(e) = ctrlc::set_handler(|| {
         if tether::STOP.load(Ordering::Relaxed) {
@@ -136,7 +148,7 @@ fn install_signal_handler() {
 }
 
 fn cmd_run(a: &RunArgs) -> bool {
-    if !require_root("run") {
+    if !require_root(&command_line("run", a)) {
         return false;
     }
     if let Some(v) = state::read().filter(|v| v["pid"] != std::process::id()) {
@@ -165,6 +177,13 @@ fn cmd_run(a: &RunArgs) -> bool {
 }
 
 fn cmd_probe() -> bool {
+    if let Some(v) = state::read() {
+        error!(
+            "a tether is already using the phone (pid {}); stop it first, then probe",
+            v["pid"]
+        );
+        return false;
+    }
     install_signal_handler();
     let ok = tether::run(&tether::Options {
         probe: true,
@@ -197,11 +216,13 @@ fn mb(v: &serde_json::Value) -> String {
 fn cmd_status(as_json: bool) -> bool {
     let st = state::read();
     let primary = netservice::primary_interface();
-    let devices: Vec<String> = usbnet::find_all()
-        .unwrap_or_default()
-        .iter()
-        .map(|f| f.describe())
-        .collect();
+    let usb = usbnet::find_all();
+    let devices: Vec<String> = usb
+        .as_ref()
+        .map(|v| v.iter().map(|f| f.describe()).collect())
+        .unwrap_or_default();
+    // An enumeration failure is not "no phone": say so instead of implying the cable is out.
+    let usb_error = usb.as_ref().err().map(|e| format!("{e:#}"));
     let installed = launchd::is_installed();
     if as_json {
         println!(
@@ -212,9 +233,10 @@ fn cmd_status(as_json: bool) -> bool {
                 "running": st,
                 "primary_interface": primary,
                 "tethering_devices": devices,
+                "usb_error": usb_error,
             })
         );
-        return true;
+        return usb_error.is_none();
     }
     println!(
         "Background service: {}",
@@ -268,6 +290,10 @@ fn cmd_status(as_json: bool) -> bool {
         "Primary network:    {}",
         primary.unwrap_or_else(|| "none".into())
     );
+    if let Some(e) = usb_error {
+        println!("Phone:              USB enumeration failed: {e}");
+        return false;
+    }
     if devices.is_empty() {
         println!("Phone:              no phone with USB tethering on");
         for h in usbnet::hints() {
@@ -311,13 +337,23 @@ fn cmd_devices(as_json: bool) -> bool {
     true
 }
 
-fn cmd_install(a: &RunArgs, verbose: u8) -> bool {
-    if !require_root("install") {
+fn cmd_install(a: &RunArgs, verbose: u8, log_file: Option<&std::path::Path>) -> bool {
+    if !require_root(&command_line("install", a)) {
         return false;
+    }
+    if a.once {
+        error!(
+            "`--once` does not work with the background service, which always waits for the phone; \
+             use `sudo usb-android-tethering run --once` instead"
+        );
+        return false;
+    }
+    if log_file.is_some_and(|p| p != std::path::Path::new(launchd::LOG)) {
+        warn!("the background service always logs to {}", launchd::LOG);
     }
     if let Some(v) = state::read().filter(|_| !launchd::is_installed()) {
         error!(
-            "a foreground instance is running (pid {}); stop it first with Ctrl+C",
+            "a foreground instance is running (pid {}); stop it with Ctrl+C, then run install again",
             v["pid"]
         );
         return false;
@@ -387,11 +423,7 @@ fn cmd_cleanup() -> bool {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let verbosity = if cli.quiet {
-        -1
-    } else {
-        cli.verbose.min(2) as i8
-    };
+    let verbosity = verbosity(cli.quiet, cli.verbose);
     if let Err(e) = logging::init(verbosity, cli.log_file.as_deref()) {
         eprintln!("error: {e:#}");
         return ExitCode::from(2);
@@ -401,7 +433,14 @@ fn main() -> ExitCode {
         Cmd::Status { json } => cmd_status(json),
         Cmd::Devices { json } => cmd_devices(json),
         Cmd::Probe => cmd_probe(),
-        Cmd::Install(a) => cmd_install(&a, cli.verbose),
+        Cmd::Install(a) => {
+            if cli.quiet {
+                warn!(
+                    "the background service always logs at info level; `--quiet` only applies now"
+                );
+            }
+            cmd_install(&a, verbosity.max(0) as u8, cli.log_file.as_deref())
+        }
         Cmd::Uninstall { purge } => cmd_uninstall(purge),
         Cmd::Cleanup => cmd_cleanup(),
         Cmd::Guard { pid } => {

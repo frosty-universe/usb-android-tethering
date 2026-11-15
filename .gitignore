@@ -9,8 +9,10 @@
 /CLAUDE.md
 /CLAUDE.local.md
 /.claude/
+/.claude-antislop.sha256
 /.remember/
 /removed-droidtether-backup/
 .DS_Store
 *.swp
 *.log
+*.bak

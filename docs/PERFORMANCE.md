@@ -10,13 +10,20 @@ What the program itself controls, and what this document tracks, is **cost**: th
 
 ## Methodology
 
-Run `scripts/bench.sh [label] [bytes]` against an online tether. It needs no root.
+Run `scripts/bench.sh [label] [bytes]` against an online tether. It needs no root, but it does need `pgrep`, `stat`, `top`, `curl` and `python3` (for reading the status JSON). `label` is free text in the header (default `bench`); `bytes` is the download size (default 30000000). The script exits with an error if no running instance or no readable status file is found, or if the test download fails.
 
-- **CPU time** comes from `ps` for the tether process (not the crash guard).
-- **Bytes carried** come from the tether's own counters (`status --json`, `rx_bytes + tx_bytes`).
-- Both are sampled right after the status file refreshes, so they cover the same interval. Background traffic (other apps, a VPN's keep-alives) is counted on *both* sides of the ratio instead of skewing it.
-- Load is a download of `bytes` (default 30 MB) from `speed.cloudflare.com`.
-- The headline metric is **CPU per MB carried**. Raw speed is reported but reflects the mobile network.
+What the script measures, exactly:
+
+- **CPU time** comes from `ps -o time=` for the tether process (not the crash guard), parsed from `[[dd-]hh:]mm:ss`.
+- **Bytes carried** come from the tether's own counters: `traffic.rx_bytes + traffic.tx_bytes` in `/var/run/usb-android-tethering.json`, read with `python3`.
+- **Both are sampled at the same instant**, right after the status file is rewritten. The script waits up to 7 s for the file's mtime to change, then reads CPU time, counters and wall-clock time together. The status file is rewritten at most every 5 s while online, and only when its contents change.
+- **Load** is a download of `bytes` from `https://speed.cloudflare.com/__down?bytes=N`, with a 180 s timeout, discarded entirely if it fails.
+- **Background cost** is a separate 10 s `top -l 2 -s 10 -pid PID` sample taken before the download: CPU percentage and idle wakeups.
+- **Memory** is `ps -o rss=` at the end of the run.
+
+The headline metric is **CPU per MB carried**: CPU seconds between the two samples divided by megabytes carried between them. Because background traffic (other apps, a VPN's keep-alives) is counted on both sides of the ratio, it doesn't skew the result.
+
+Two numbers in the results below do not come from `scripts/bench.sh`; their methods are stated next to them (round-trip time from `ping`, and the BPF filter check from `netstat -B`). Everything else is a bench run.
 
 Because the cost per byte depends on packet sizes (many small packets cost more than a few full-size ones), always compare builds on the same machine, phone and traffic mix.
 

@@ -28,21 +28,29 @@ fn console_user() -> Option<RunAs> {
     if uid == 0 {
         return None; // nobody logged in (login window)
     }
-    let mut pw: libc::passwd = unsafe { std::mem::zeroed() };
-    let mut result = std::ptr::null_mut();
+    // The passwd entry may not fit in the first buffer; grow it on ERANGE.
     let mut buf = vec![0 as libc::c_char; 4096];
-    let rc = unsafe { libc::getpwuid_r(uid, &mut pw, buf.as_mut_ptr(), buf.len(), &mut result) };
-    if rc != 0 || result.is_null() || pw.pw_dir.is_null() {
-        return None;
+    loop {
+        let mut pw: libc::passwd = unsafe { std::mem::zeroed() };
+        let mut result = std::ptr::null_mut();
+        let rc =
+            unsafe { libc::getpwuid_r(uid, &mut pw, buf.as_mut_ptr(), buf.len(), &mut result) };
+        if rc == libc::ERANGE && buf.len() < 1 << 20 {
+            buf.resize(buf.len() * 2, 0);
+            continue;
+        }
+        if rc != 0 || result.is_null() || pw.pw_dir.is_null() {
+            return None;
+        }
+        let home = unsafe { CStr::from_ptr(pw.pw_dir) }
+            .to_string_lossy()
+            .into_owned();
+        return Some(RunAs {
+            uid,
+            gid: pw.pw_gid,
+            home: home.into(),
+        });
     }
-    let home = unsafe { CStr::from_ptr(pw.pw_dir) }
-        .to_string_lossy()
-        .into_owned();
-    Some(RunAs {
-        uid,
-        gid: pw.pw_gid,
-        home: home.into(),
-    })
 }
 
 /// True if `bin` is safe to execute on behalf of `user`: a regular file owned by root or the
@@ -74,6 +82,29 @@ pub fn find() -> Option<PathBuf> {
         .find(|p| p.is_file() && trusted(p, user.as_ref()))
 }
 
+/// `adb get-state`, from a run that may also have printed daemon banners on either stream.
+#[derive(Debug, PartialEq)]
+enum State {
+    Device,
+    Unauthorized,
+    Other,
+}
+
+fn parse_state(text: &str) -> State {
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    if lines.iter().any(|l| l.contains("unauthorized")) {
+        return State::Unauthorized;
+    }
+    if lines.contains(&"device") {
+        return State::Device;
+    }
+    State::Other
+}
+
 fn adb(bin: &Path, serial: &str, args: &[&str]) -> Option<String> {
     let mut cmd = Command::new(bin);
     cmd.arg("-s")
@@ -85,9 +116,23 @@ fn adb(bin: &Path, serial: &str, args: &[&str]) -> Option<String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     if unsafe { libc::geteuid() } == 0 {
-        // Never run a user-writable binary as root: drop to the console user.
+        // Never run a user-writable binary as root: drop to the console user. Root's
+        // supplementary groups go too (`CommandExt::groups` is unstable; pre_exec is the only
+        // stable hook, and it runs before exec, in the child).
         let user = console_user()?;
-        cmd.uid(user.uid).gid(user.gid).env("HOME", &user.home);
+        let (uid, gid) = (user.uid, user.gid);
+        cmd.env("HOME", &user.home);
+        unsafe {
+            cmd.pre_exec(move || {
+                if libc::setgroups(0, std::ptr::null()) != 0
+                    || libc::setgid(gid) != 0
+                    || libc::setuid(uid) != 0
+                {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
     } else if let Some(home) = std::env::var_os("HOME") {
         cmd.env("HOME", home);
     }
@@ -97,7 +142,11 @@ fn adb(bin: &Path, serial: &str, args: &[&str]) -> Option<String> {
         match child.try_wait() {
             Ok(Some(_)) => break,
             Ok(None) => std::thread::sleep(Duration::from_millis(100)),
-            Err(_) => return None,
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
         }
     }
     if child.try_wait().ok()?.is_none() {
@@ -116,9 +165,10 @@ pub fn enable_tethering(serial: &str, function: &str) -> bool {
         debug!("no trusted adb found; automatic tethering switch unavailable");
         return false;
     };
-    match adb(&bin, serial, &["get-state"]).as_deref().map(str::trim) {
-        Some("device") => {}
-        Some(s) if s.contains("unauthorized") => {
+    let state = adb(&bin, serial, &["get-state"]).map(|o| parse_state(&o));
+    match state {
+        Some(State::Device) => {}
+        Some(State::Unauthorized) => {
             warn!(
                 "allow USB debugging on the phone (tap \"Allow\" on the prompt) so tethering can switch on automatically"
             );
@@ -188,5 +238,37 @@ mod tests {
         }
         assert!(!trusted(&dir.join("missing"), Some(&me)));
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_directory_is_not_a_trusted_binary() {
+        let dir = std::env::temp_dir().join(format!("uat-adb-dir-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let me = RunAs {
+            uid: unsafe { libc::getuid() },
+            gid: 0,
+            home: dir.clone(),
+        };
+        assert!(!trusted(&dir, Some(&me)));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn reads_state_through_adb_banners() {
+        // The first adb run starts a daemon and prints banners on the same stream.
+        let t = "* daemon not running; starting now at tcp:5037\n* daemon started successfully\ndevice\n";
+        assert_eq!(parse_state(t), State::Device);
+        assert_eq!(parse_state("device\n"), State::Device);
+        assert_eq!(parse_state("unauthorized\n"), State::Unauthorized);
+        assert_eq!(
+            parse_state("error: device unauthorized.\n"),
+            State::Unauthorized
+        );
+        assert_eq!(parse_state("offline\n"), State::Other);
+        assert_eq!(parse_state(""), State::Other);
+        assert_eq!(
+            parse_state("error: no devices/emulators found\n"),
+            State::Other
+        );
     }
 }

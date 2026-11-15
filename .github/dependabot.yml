@@ -1,4 +1,6 @@
 version: 2
+# Weekly, one PR per ecosystem. Workflow actions stay pinned to commit SHAs
+# (the `# vX.Y.Z` comment on each `uses:` line is what Dependabot updates).
 updates:
   - package-ecosystem: cargo
     directory: /
@@ -10,4 +12,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]

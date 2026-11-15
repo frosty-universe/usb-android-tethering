@@ -14,7 +14,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- `.env.example`, `CLAUDE.md.example`, `AGENTS.md.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored.
+- **Homebrew tap.** `brew install frosty-universe/usb-android-tethering/usb-android-tethering` builds the tagged source. The release workflow updates the tap on every version tag when a `TAP_TOKEN` secret is set. See docs/HOMEBREW.md.
+- **Installer improvements.** `install.sh` now takes `--help` and `--uninstall`, rejects unknown options, reuses an exact-asset-name checksum match, and prints what failed and what to do next. `UAT_VERSION=vX.Y.Z` still installs a specific release.
+- `scripts/check-install.sh`, a no-root check that downloads a release, verifies its checksum and runs the binary.
+- `.env.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored; `AGENTS.md` points at `CLAUDE.md`, which `scripts/merge-claude-md.sh` maintains from `scripts/claude-antislop.md` behind a hash guard that never overwrites local edits.
+- docs/COMPATIBILITY.md and docs/FAQ.md.
+
+### Removed
+
+- `CLAUDE.md.example` and `AGENTS.md.example`. The real files are local and gitignored; the shared instructions live in `scripts/claude-antislop.md`.
+
+### Fixed
+
+- A failed USB setup could leave an interface claimed until the handle was dropped; both interfaces are now released on every error path.
+- `RxRing::start` leaked its transfers if a later submit failed; the ring is now dropped, which cancels and frees them.
+- Hardened the engine and protocol paths against panics from device-controlled input, and added tests for state, logging, guard, NCM/RNDIS packing, scutil parsing and BPF record parsing (67 tests).
 
 ## [0.1.0] - 2026-09-27
 

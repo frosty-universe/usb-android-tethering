@@ -2,6 +2,10 @@ name: Device report
 description: Tell us whether your phone works (success reports are just as useful!)
 labels: [device-report]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Device reports are how the compatibility table grows. Run `usb-android-tethering devices --json` with the phone attached and tethering switched on.
   - type: dropdown
     id: result
     attributes:
@@ -23,6 +27,8 @@ body:
     id: macos
     attributes:
       label: macOS version and Mac
+      description: The macOS release and the chip, for example "macOS 26.7 on an M2 Mac mini" or "macOS 15.8 on an Intel iMac (2020)".
+      placeholder: macOS 26.7, Mac mini (M2) — or macOS 15.8, iMac 27-inch (2020, Intel)
     validations:
       required: true
   - type: textarea
@@ -36,7 +42,9 @@ body:
     id: log
     attributes:
       label: Connection log
-      description: The lines logged when the phone connects (with `-v`), including "link up:" and "online"
+      description: |
+        The lines logged when the phone connects (run with `-v`), including "link up:" and "online".
+        `/var/log/usb-android-tethering.log` has the background service's log.
       render: text
   - type: textarea
     id: notes

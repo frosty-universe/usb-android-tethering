@@ -30,6 +30,9 @@ jobs:
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != Cargo.toml v$version"; exit 1; }
 
+      - name: Validate packaging scripts
+        run: sh -n install.sh scripts/check-install.sh scripts/brew/update-tap.sh
+
       - name: Test
         run: cargo test --locked
 
@@ -45,13 +48,21 @@ jobs:
             target/aarch64-apple-darwin/release/usb-android-tethering \
             target/x86_64-apple-darwin/release/usb-android-tethering
           codesign --force --sign - dist/usb-android-tethering   # ad-hoc signature for arm64
-          lipo -archs dist/usb-android-tethering
-          ./dist/usb-android-tethering --version
+          archs=$(lipo -archs dist/usb-android-tethering)
+          echo "archs: $archs"
+          case $archs in *arm64*) ;; *) echo "missing arm64 slice"; exit 1 ;; esac
+          case $archs in *x86_64*) ;; *) echo "missing x86_64 slice"; exit 1 ;; esac
+          ./dist/usb-android-tethering --version > v.txt
+          case "$(cat v.txt)" in
+            *" ${GITHUB_REF_NAME#v}") ;;
+            *) echo "binary says '$(cat v.txt)', tag is $GITHUB_REF_NAME"; exit 1 ;;
+          esac
 
       - name: Package and checksum
         run: |
           cp LICENSE-MIT LICENSE-APACHE README.md dist/
           tar -czf "$ASSET" -C dist usb-android-tethering LICENSE-MIT LICENSE-APACHE README.md
+          tar -tzf "$ASSET"
           shasum -a 256 "$ASSET" > SHA256SUMS
           cat SHA256SUMS
 
@@ -77,3 +88,30 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" "$ASSET" SHA256SUMS \
             --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+
+      # Runs only when the secret exists, so a release never fails because the tap is unset.
+      - name: Update the Homebrew tap
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+        run: |
+          if [ -z "${TAP_TOKEN:-}" ]; then
+            echo "::warning::TAP_TOKEN is not set; skipping the Homebrew tap update"
+            exit 0
+          fi
+          tap="$RUNNER_TEMP/tap"
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TAP_TOKEN" | base64)"
+          git init -q "$tap"
+          git -C "$tap" remote add origin https://github.com/frosty-universe/homebrew-usb-android-tethering.git
+          git -C "$tap" -c http.extraheader="$auth" pull --depth 1 origin main
+          TAP_DIR="$tap" scripts/brew/update-tap.sh "$GITHUB_REF_NAME"
+          TAP_DIR="$tap" scripts/brew/update-tap.sh --check "$GITHUB_REF_NAME"
+          if git -C "$tap" diff --quiet; then
+            echo "tap formula already up to date"
+            exit 0
+          fi
+          git -C "$tap" add Formula/usb-android-tethering.rb
+          git -C "$tap" \
+            -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "usb-android-tethering $GITHUB_REF_NAME"
+          git -C "$tap" -c http.extraheader="$auth" push origin HEAD:main

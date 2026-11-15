@@ -24,7 +24,8 @@ body:
     id: macos
     attributes:
       label: macOS version and Mac
-      placeholder: macOS 26.5, MacBook Pro (Apple Silicon)
+      description: The macOS release and the chip, for example "macOS 26.7 on an M4 MacBook Air" or "macOS 15.8 on an Intel MacBook Pro (2019)".
+      placeholder: macOS 26.7, MacBook Air (M4) — or macOS 15.8, MacBook Pro 16-inch (2019, Intel)
     validations:
       required: true
   - type: input
@@ -39,9 +40,9 @@ body:
     attributes:
       label: How are you running it?
       options:
-        - Background service (install)
-        - Foreground (sudo usb-android-tethering)
-        - probe / devices / status only
+        - Background service (`install`)
+        - Foreground (`sudo usb-android-tethering run`)
+        - Read-only commands only (`status`, `devices`, `probe`)
     validations:
       required: true
   - type: textarea
@@ -55,7 +56,7 @@ body:
     attributes:
       label: Logs
       description: |
-        Run in the foreground with `sudo usb-android-tethering -vv`, or attach `/var/log/usb-android-tethering.log`.
+        Attach `/var/log/usb-android-tethering.log`, or run in the foreground with `sudo usb-android-tethering run -vv`.
         Remove anything you consider private (for example public IP addresses).
       render: text
   - type: input

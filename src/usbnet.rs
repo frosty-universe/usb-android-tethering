@@ -11,7 +11,7 @@
 //! and it never detaches a native driver.
 
 use crate::{ncm, rndis};
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use rusb::{Direction, GlobalContext, TransferType, UsbContext};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -137,7 +137,7 @@ fn data_interface(
             let n = alt.interface_number();
             let rank = if Some(n) == union {
                 0
-            } else if n == ctrl_if + 1 {
+            } else if ctrl_if.checked_add(1) == Some(n) {
                 1
             } else {
                 2
@@ -383,6 +383,22 @@ fn stable_mac(vid: u16, pid: u16, serial: &str) -> [u8; 6] {
     [(b[0] & 0xfe) | 0x02, b[1], b[2], b[3], b[4], b[5]]
 }
 
+/// Claims the control interface, then the data interface. If the second claim fails, the first
+/// is released so the next attempt (or another tool) isn't blocked by a half-open claim.
+fn claim_both(
+    h: &rusb::DeviceHandle<GlobalContext>,
+    ctrl: u8,
+    data: u8,
+    may_detach: bool,
+) -> Result<()> {
+    claim(h, ctrl, may_detach)?;
+    if let Err(e) = claim(h, data, may_detach) {
+        let _ = h.release_interface(ctrl);
+        return Err(e);
+    }
+    Ok(())
+}
+
 fn claim(h: &rusb::DeviceHandle<GlobalContext>, iface: u8, may_detach: bool) -> Result<()> {
     match h.claim_interface(iface) {
         Ok(()) => Ok(()),
@@ -407,8 +423,7 @@ impl Device {
                 .context("select the tethering USB configuration")?;
         }
         let rndis = f.protocol == Protocol::Rndis;
-        claim(&h, f.ctrl_if, rndis)?;
-        claim(&h, f.data_if, rndis)?;
+        claim_both(&h, f.ctrl_if, f.data_if, rndis)?;
         let serial = f
             .device
             .device_descriptor()
@@ -417,12 +432,40 @@ impl Device {
             .unwrap_or_default();
         let fallback_mac = stable_mac(f.vid, f.pid, &serial);
 
+        // Past this point the interfaces are claimed: every error path releases them, so a
+        // failed attempt doesn't leave the phone half-owned until the USB handle is dropped.
+        match Self::configure(&h, f, fallback_mac) {
+            Ok((framing, mac)) => Ok(Device {
+                h,
+                ctrl_if: f.ctrl_if,
+                data_if: f.data_if,
+                ep_in: f.ep_in,
+                ep_out: f.ep_out,
+                framing,
+                mac,
+                tx: Mutex::new(vec![0; framing.tx_buf_len()]),
+            }),
+            Err(e) => {
+                let _ = h.release_interface(f.data_if);
+                let _ = h.release_interface(f.ctrl_if);
+                Err(e)
+            }
+        }
+    }
+
+    /// Runs the protocol setup once both interfaces are claimed. No cleanup here: `open`
+    /// releases the interfaces if this returns an error.
+    fn configure(
+        h: &rusb::DeviceHandle<GlobalContext>,
+        f: &Found,
+        fallback_mac: [u8; 6],
+    ) -> Result<(Framing, [u8; 6])> {
         let (framing, mac) = match f.protocol {
             Protocol::Rndis => {
                 if f.data_alt != 0 {
                     h.set_alternate_setting(f.data_if, f.data_alt)?;
                 }
-                let (limits, mac) = rndis::initialize(&h, f.ctrl_if, f.int_ep, f.out_mps)?;
+                let (limits, mac) = rndis::initialize(h, f.ctrl_if, f.int_ep, f.out_mps)?;
                 (Framing::Rndis(limits), mac.unwrap_or(fallback_mac))
             }
             Protocol::Ncm | Protocol::Ecm => {
@@ -430,7 +473,7 @@ impl Device {
                 // select the alt setting with the bulk endpoints to start the data path.
                 let _ = h.set_alternate_setting(f.data_if, 0);
                 let framing = if f.protocol == Protocol::Ncm {
-                    Framing::Ncm(ncm::setup(&h, f.ctrl_if, f.out_mps)?)
+                    Framing::Ncm(ncm::setup(h, f.ctrl_if, f.out_mps)?)
                 } else {
                     // SET_ETHERNET_PACKET_FILTER: DIRECTED | BROADCAST | ALL_MULTICAST.
                     let _ = h.write_control(
@@ -443,28 +486,12 @@ impl Device {
                     );
                     Framing::Ecm { mps: f.out_mps }
                 };
-                if f.data_alt == 0 {
-                    bail!(
-                        "{} data interface has no alternate setting with endpoints",
-                        f.protocol.name()
-                    );
-                }
                 h.set_alternate_setting(f.data_if, f.data_alt)
                     .context("activate the data interface")?;
                 (framing, fallback_mac)
             }
         };
-        let tx = vec![0; framing.tx_buf_len()];
-        Ok(Device {
-            h,
-            ctrl_if: f.ctrl_if,
-            data_if: f.data_if,
-            ep_in: f.ep_in,
-            ep_out: f.ep_out,
-            framing,
-            mac,
-            tx: Mutex::new(tx),
-        })
+        Ok((framing, mac))
     }
 
     /// Raw libusb handle for the asynchronous transfer engine.
@@ -719,5 +746,15 @@ mod tests {
         let mut got = 0;
         f.parse(&out[..60], |_| got += 1);
         assert_eq!(got, 1);
+    }
+
+    #[test]
+    fn ecm_drops_an_oversize_frame_without_panicking() {
+        let f = Framing::Ecm { mps: 512 };
+        let big = vec![0u8; 200];
+        let mut small = vec![0u8; 100];
+        assert_eq!(f.pack_with(1, |_| &big, &mut small), (0, 1));
+        let mut short = vec![0u8; 13];
+        assert_eq!(f.pack_with(1, |_| &big, &mut short), (0, 1));
     }
 }

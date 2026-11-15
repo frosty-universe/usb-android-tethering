@@ -83,8 +83,7 @@ impl TxLimits {
         out: &mut [u8],
     ) -> (usize, usize) {
         // One spare byte keeps the transfer off a max-packet boundary (no zero-length packet).
-        // `soft` is the phone's limit when aggregating; `hard` is the buffer, which bounds a lone frame.
-        let hard = out.len() - 1;
+        // `soft` is the smaller of the phone's transfer limit and the buffer.
         let soft = self.max_xfer.min(out.len()) - 1;
         let (mut len, mut used, mut last) = (0, 0, 0);
         for i in 0..count {
@@ -93,8 +92,8 @@ impl TxLimits {
             if used > 0 && (used == self.max_pkts || len + msg > soft) {
                 break;
             }
-            if len + msg > hard {
-                // A frame bigger than the phone allows: drop it rather than wedge the queue.
+            if len + msg > soft {
+                // A frame bigger than the phone accepts: drop it rather than wedge the queue.
                 return (0, 1);
             }
             let hdr = [
@@ -207,10 +206,7 @@ impl Control<'_> {
 
     fn query(&mut self, oid: u32) -> Result<Vec<u8>> {
         let r = self.command(Self::message(&[MSG_QUERY, 28, 0, oid, 0, 20, 0], &[]))?;
-        let (len, off) = (le32(&r, 16) as usize, le32(&r, 20) as usize + 8);
-        r.get(off..off + len)
-            .map(<[u8]>::to_vec)
-            .context("malformed RNDIS QUERY_CMPLT")
+        parse_query_cmplt(&r).context("malformed RNDIS QUERY_CMPLT")
     }
 
     fn set(&mut self, oid: u32, value: &[u8]) -> Result<()> {
@@ -259,6 +255,15 @@ pub fn initialize(
         }
     }
     Err(last.unwrap()).context("RNDIS set packet filter")
+}
+
+/// Payload of a QUERY_CMPLT: InformationBufferLength @16, InformationBufferOffset @20.
+/// A device may answer with only the 16-byte completion header, so both fields are bounds-checked.
+fn parse_query_cmplt(r: &[u8]) -> Option<Vec<u8>> {
+    let hdr = r.get(..24)?;
+    let len = le32(hdr, 16) as usize;
+    let off = (le32(hdr, 20) as usize).checked_add(8)?;
+    r.get(off..off.checked_add(len)?).map(<[u8]>::to_vec)
 }
 
 fn le32(b: &[u8], off: usize) -> u32 {
@@ -321,10 +326,75 @@ mod tests {
     }
 
     #[test]
+    fn parse_rejects_truncated_packet() {
+        let frame = [0x5au8; 60];
+        let l = limits(2, 4, 512);
+        let mut out = vec![0u8; l.buf_len()];
+        let (n, _) = l.pack(&[&frame], &mut out);
+        for cut in 0..n {
+            let mut calls = 0;
+            parse_packets(&out[..cut], |_| calls += 1);
+            assert_eq!(calls, 0, "{cut} bytes must not yield a frame");
+        }
+        // DataOffset/DataLength that run past MessageLength are dropped.
+        let mut bad = out[..n].to_vec();
+        bad[8..12].copy_from_slice(&1000u32.to_le_bytes());
+        let mut calls = 0;
+        parse_packets(&bad, |_| calls += 1);
+        assert_eq!(calls, 0);
+    }
+
+    #[test]
+    fn pack_respects_max_xfer_smaller_than_buffer() {
+        let l = TxLimits {
+            max_pkts: 2,
+            max_xfer: 1600,
+            align: 1,
+            mps: 512,
+        };
+        let mut out = vec![0u8; l.buf_len()];
+        assert!(out.len() > l.max_xfer);
+        let ok = vec![0u8; 1500];
+        assert_eq!(l.pack(&[&ok], &mut out), (1544, 1));
+        let big = vec![0u8; 1600];
+        assert_eq!(l.pack(&[&big], &mut out), (0, 1), "over MaxTransferSize");
+    }
+
+    #[test]
     fn parse_rejects_garbage() {
         let mut calls = 0;
         parse_packets(&[0xff; 100], |_| calls += 1);
         parse_packets(&[], |_| calls += 1);
         assert_eq!(calls, 0);
+    }
+
+    #[test]
+    fn query_cmplt_bounds() {
+        let cmplt = |value: &[u8], off: u32| {
+            let mut r = Vec::new();
+            for v in [CMPLT | MSG_QUERY, 0, 1, 0, value.len() as u32, off] {
+                r.extend_from_slice(&v.to_le_bytes());
+            }
+            r.extend_from_slice(value);
+            r
+        };
+        // InformationBufferOffset is relative to byte 8 of the message.
+        assert_eq!(
+            parse_query_cmplt(&cmplt(b"MAC123", 16)),
+            Some(b"MAC123".to_vec())
+        );
+        // 16..23-byte completions lack the length/offset fields entirely.
+        let short = cmplt(b"", 0);
+        for n in 0..24 {
+            assert_eq!(parse_query_cmplt(&short[..n]), None);
+        }
+        // Hostile length/offset must not overflow the slice arithmetic.
+        let mut r = cmplt(b"x", 24);
+        r[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(parse_query_cmplt(&r), None);
+        r[16..20].copy_from_slice(&1u32.to_le_bytes());
+        r[20..24].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(parse_query_cmplt(&r), None);
+        assert_eq!(parse_query_cmplt(&cmplt(b"x", 64)), None);
     }
 }

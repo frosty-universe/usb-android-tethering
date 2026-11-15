@@ -7,7 +7,7 @@
 //! Frames written to the peer through BPF arrive on the host side as received traffic, and
 //! frames the host side transmits are read from the peer through BPF.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
 use std::ffi::CString;
 use std::io;
 use std::ops::Range;
@@ -44,8 +44,21 @@ fn ifconfig(args: &[&str]) -> Result<()> {
 }
 
 pub fn exists(name: &str) -> bool {
-    let c = CString::new(name).unwrap();
-    unsafe { libc::if_nametoindex(c.as_ptr()) != 0 }
+    CString::new(name).is_ok_and(|c| unsafe { libc::if_nametoindex(c.as_ptr()) != 0 })
+}
+
+/// Copies `name` into the `ifreq` name field; the kernel needs it NUL-terminated.
+fn set_ifname(ifr: &mut libc::ifreq, name: &str) -> Result<()> {
+    ensure!(
+        name.len() < ifr.ifr_name.len(),
+        "interface name {name:?} is too long"
+    );
+    // Zero first so a name shorter than a previous one stays NUL-terminated.
+    ifr.ifr_name = [0; 16];
+    for (dst, src) in ifr.ifr_name.iter_mut().zip(name.as_bytes()) {
+        *dst = *src as libc::c_char;
+    }
+    Ok(())
 }
 
 /// Destroys a pair left behind by a previous crash. Returns true if anything was removed.
@@ -173,7 +186,7 @@ impl Feth {
     fn open_bpf(&mut self) -> Result<()> {
         let fd = (0..256)
             .find_map(|i| {
-                let path = CString::new(format!("/dev/bpf{i}")).unwrap();
+                let path = CString::new(format!("/dev/bpf{i}")).ok()?;
                 let fd = unsafe { libc::open(path.as_ptr(), libc::O_RDWR | libc::O_CLOEXEC) };
                 (fd >= 0).then(|| unsafe { OwnedFd::from_raw_fd(fd) })
             })
@@ -183,9 +196,7 @@ impl Feth {
         let zero: libc::c_uint = 0;
         let mut blen = BPF_BUF;
         let mut ifr: libc::ifreq = unsafe { std::mem::zeroed() };
-        for (d, s) in ifr.ifr_name.iter_mut().zip(self.peer.as_bytes()) {
-            *d = *s as libc::c_char;
-        }
+        set_ifname(&mut ifr, &self.peer)?;
         unsafe {
             // Buffer size must be set before binding the interface.
             if libc::ioctl(raw, libc::BIOCSBLEN, &mut blen) < 0 {
@@ -214,6 +225,11 @@ impl Feth {
                 return Err(io::Error::last_os_error()).context("BIOCSETF");
             }
         }
+        // A zero-length buffer would make every read return 0 and spin the transmit thread.
+        ensure!(
+            blen as usize > 18,
+            "BPF returned an unusable buffer size ({blen})"
+        );
         self.buf_len = blen as usize;
         self.bpf = Some(fd);
         Ok(())
@@ -232,6 +248,9 @@ impl Feth {
         let n = unsafe { libc::write(self.fd(), frame.as_ptr().cast(), frame.len()) };
         if n < 0 {
             return Err(io::Error::last_os_error());
+        }
+        if n as usize != frame.len() {
+            return Err(io::Error::other("short write to BPF"));
         }
         Ok(())
     }
@@ -279,9 +298,18 @@ impl Feth {
             };
         }
         if pfd[1].revents != 0 {
+            // Drain the self-pipe, or the next poll would return immediately and spin.
+            let mut sink = [0u8; 16];
+            unsafe {
+                libc::read(
+                    self.wake_r.as_raw_fd(),
+                    sink.as_mut_ptr().cast(),
+                    sink.len(),
+                )
+            };
             return Ok(false);
         }
-        if pfd[0].revents & (libc::POLLERR | libc::POLLNVAL) != 0 {
+        if pfd[0].revents & (libc::POLLERR | libc::POLLNVAL | libc::POLLHUP) != 0 {
             return Err(io::Error::other("BPF device error (interface removed?)"));
         }
         let n = unsafe { libc::read(self.fd(), buf.as_mut_ptr().cast(), buf.len()) };
@@ -300,18 +328,34 @@ impl Feth {
 /// Splits a BPF read into frames: `bpf_hdr { timeval32 tstamp; u32 caplen; u32 datalen; u16 hdrlen; }`
 /// plus data, each record padded to 4 bytes (BPF_WORDALIGN).
 fn parse_bpf(buf: &[u8], frames: &mut Vec<Range<usize>>) {
-    let n = buf.len();
     let mut off = 0;
-    while off + 18 <= n {
-        let caplen = u32::from_ne_bytes(buf[off + 8..off + 12].try_into().unwrap()) as usize;
-        let hdrlen = u16::from_ne_bytes(buf[off + 16..off + 18].try_into().unwrap()) as usize;
+    while let (Some(caplen), Some(hdrlen)) = (u32_at(buf, off + 8), u16_at(buf, off + 16)) {
+        let (caplen, hdrlen) = (caplen as usize, hdrlen as usize);
         let start = off + hdrlen;
-        if hdrlen < 18 || start + caplen > n {
+        let Some(end) = start.checked_add(caplen) else {
+            break;
+        };
+        // A header shorter than bpf_hdr, or a record running past the read: truncated tail.
+        if hdrlen < 18 || end > buf.len() {
             break;
         }
-        frames.push(start..start + caplen);
-        off += (hdrlen + caplen).next_multiple_of(4);
+        frames.push(start..end);
+        off = end.next_multiple_of(4);
     }
+}
+
+/// The `bpf_hdr` fields are native-endian, and a device-supplied `caplen` must never index
+/// out of the buffer, so both readers return `None` instead of panicking.
+fn u32_at(buf: &[u8], at: usize) -> Option<u32> {
+    Some(u32::from_ne_bytes(
+        buf.get(at..at.checked_add(4)?)?.try_into().ok()?,
+    ))
+}
+
+fn u16_at(buf: &[u8], at: usize) -> Option<u16> {
+    Some(u16::from_ne_bytes(
+        buf.get(at..at.checked_add(2)?)?.try_into().ok()?,
+    ))
 }
 
 impl Drop for Feth {
@@ -347,5 +391,93 @@ mod tests {
         assert_eq!(frames.len(), 2);
         assert!(buf[frames[0].clone()].iter().all(|&b| b == 1));
         assert_eq!(buf[frames[1].clone()].len(), 61);
+    }
+
+    fn record_with(caplen: u32, hdrlen: u16, data: &[u8]) -> Vec<u8> {
+        let mut r = vec![0u8; 18];
+        r[8..12].copy_from_slice(&caplen.to_ne_bytes());
+        r[12..16].copy_from_slice(&caplen.to_ne_bytes());
+        r[16..18].copy_from_slice(&hdrlen.to_ne_bytes());
+        r.extend_from_slice(data);
+        r.resize(r.len().next_multiple_of(4), 0);
+        r
+    }
+
+    #[test]
+    fn parse_bpf_rejects_bad_headers_without_panicking() {
+        let mut frames = Vec::new();
+        // A caplen that would overflow the offset arithmetic.
+        parse_bpf(&record_with(u32::MAX, 18, &[0; 8]), &mut frames);
+        assert!(frames.is_empty());
+        // A caplen past the end of the read.
+        parse_bpf(&record_with(4096, 18, &[0; 8]), &mut frames);
+        assert!(frames.is_empty());
+        // A header shorter than bpf_hdr.
+        parse_bpf(&record_with(0, 4, &[0; 8]), &mut frames);
+        assert!(frames.is_empty());
+        // A record that is exactly a header.
+        parse_bpf(&record_with(0, 18, &[]), &mut frames);
+        assert_eq!(frames, vec![18..18]);
+        // Empty input, and every truncated prefix of a valid batch.
+        frames.clear();
+        parse_bpf(&[], &mut frames);
+        assert!(frames.is_empty());
+        let good = record_with(4, 18, &[7; 4]);
+        for n in 0..18 + 4 {
+            let mut f = Vec::new();
+            parse_bpf(&good[..n], &mut f);
+            assert!(f.is_empty(), "prefix of {n} bytes produced a frame");
+        }
+    }
+
+    #[test]
+    fn parse_bpf_skips_padding_between_records() {
+        // hdrlen 18 + caplen 3 = 21, padded to 24: the next record starts there.
+        let mut buf = record_with(3, 18, &[1, 2, 3]);
+        buf.extend(record_with(1, 18, &[9]));
+        let mut frames = Vec::new();
+        parse_bpf(&buf, &mut frames);
+        assert_eq!(frames, vec![18..21, 42..43]);
+        assert_eq!(&buf[frames[1].clone()], &[9]);
+    }
+
+    #[test]
+    fn ethertype_filter_accepts_only_ipv4_and_arp() {
+        let prog = ETHERTYPE_FILTER;
+        assert_eq!(prog[0].code, 0x28, "first insn must load the ethertype");
+        assert_eq!(prog[0].k, 12);
+        assert_eq!(prog[1].k, 0x0800);
+        assert_eq!(prog[2].k, 0x0806);
+        // Every jump must land inside the program, never past its end.
+        for (at, insn) in prog.iter().enumerate().take(3).skip(1) {
+            assert_eq!(insn.code, 0x15);
+            for target in [insn.jt, insn.jf] {
+                let land = at + 1 + target as usize;
+                assert!(
+                    land < prog.len(),
+                    "jump from {at} lands outside the program"
+                );
+            }
+        }
+        // IPv4 skips the ARP test to accept; ARP falls through, everything else rejects.
+        assert_eq!((prog[1].jt, prog[1].jf), (1, 0));
+        assert_eq!((prog[2].jt, prog[2].jf), (0, 1));
+        assert_eq!(prog[3].code, 0x06);
+        assert_eq!(prog[3].k, u32::MAX);
+        assert_eq!(prog[4].code, 0x06);
+        assert_eq!(prog[4].k, 0);
+    }
+
+    #[test]
+    fn interface_names_fit_the_kernel_field() {
+        assert_eq!(host_name(), "feth7070");
+        assert_eq!(peer_name(), "feth7071");
+        let mut ifr: libc::ifreq = unsafe { std::mem::zeroed() };
+        set_ifname(&mut ifr, &peer_name()).unwrap();
+        let name: Vec<u8> = ifr.ifr_name.iter().map(|&c| c as u8).collect();
+        assert_eq!(&name[..8], b"feth7071");
+        assert_eq!(name[8], 0, "name must stay NUL-terminated");
+        let too_long = "x".repeat(ifr.ifr_name.len());
+        assert!(set_ifname(&mut ifr, &too_long).is_err());
     }
 }

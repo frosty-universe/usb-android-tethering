@@ -86,6 +86,9 @@ pub fn udp_payload_to(ip: &[u8], dport: u16) -> Option<&[u8]> {
         return None;
     }
     let ihl = ((ip[0] & 0x0f) as usize) * 4;
+    if ihl < 20 {
+        return None;
+    }
     let total = (u16::from_be_bytes([ip[2], ip[3]]) as usize).min(ip.len());
     let udp = ip.get(ihl..total)?;
     if udp.len() < 8 || u16::from_be_bytes([udp[2], udp[3]]) != dport {
@@ -152,5 +155,100 @@ mod tests {
     #[test]
     fn prefix() {
         assert_eq!(mask_prefix(Ipv4Addr::new(255, 255, 255, 0)), 24);
+    }
+
+    #[test]
+    fn checksum_odd_length_and_empty() {
+        assert_eq!(checksum(&[]), 0xffff);
+        // One trailing byte is padded with a zero low byte.
+        assert_eq!(checksum(&[0x00, 0x01, 0x00]), checksum(&[0x00, 0x01]));
+    }
+
+    #[test]
+    fn rejects_short_ethernet_frames() {
+        assert!(parse_eth(&[]).is_none());
+        assert!(parse_eth(&[0u8; 13]).is_none());
+        let f = eth_frame([1; 6], [2; 6], ETHERTYPE_ARP, &[]);
+        assert_eq!(f.len(), 60, "padded to the Ethernet minimum");
+        assert_eq!(parse_eth(&f).unwrap().ethertype, ETHERTYPE_ARP);
+    }
+
+    #[test]
+    fn udp_rejects_hostile_headers() {
+        let p = udp_ipv4(
+            Ipv4Addr::new(10, 0, 0, 1),
+            Ipv4Addr::new(10, 0, 0, 2),
+            1234,
+            68,
+            b"x",
+        );
+        assert!(udp_payload_to(&p, 68).is_some());
+
+        // IHL below the 20-byte minimum must not expose header bytes as payload.
+        let mut short_ihl = p.clone();
+        short_ihl[0] = 0x44;
+        assert!(udp_payload_to(&short_ihl, 68).is_none());
+        // IHL past the packet.
+        let mut long_ihl = p.clone();
+        long_ihl[0] = 0x4f;
+        assert!(udp_payload_to(&long_ihl, 68).is_none());
+        // IP total length lying beyond the buffer is clamped, not trusted.
+        let mut long_total = p.clone();
+        long_total[2..4].copy_from_slice(&0xfff0u16.to_be_bytes());
+        assert!(udp_payload_to(&long_total, 68).is_some());
+        // UDP length below its own header, and beyond the packet, clamp safely.
+        let mut tiny_udp = p.clone();
+        tiny_udp[24..26].copy_from_slice(&0u16.to_be_bytes());
+        assert_eq!(udp_payload_to(&tiny_udp, 68), Some(&[][..]));
+        let mut huge_udp = p.clone();
+        huge_udp[24..26].copy_from_slice(&0xffffu16.to_be_bytes());
+        assert_eq!(udp_payload_to(&huge_udp, 68), Some(&b"x"[..]));
+        // Every truncation yields either None or a payload inside the input.
+        for cut in 0..p.len() {
+            if let Some(d) = udp_payload_to(&p[..cut], 68) {
+                assert!(d.len() < cut);
+            }
+        }
+    }
+
+    #[test]
+    fn fragments_and_non_udp_are_refused() {
+        let p = udp_ipv4(
+            Ipv4Addr::new(10, 0, 0, 1),
+            Ipv4Addr::new(10, 0, 0, 2),
+            68,
+            67,
+            b"y",
+        );
+        for flags in [0x2000u16, 0x0001] {
+            let mut f = p.clone();
+            f[6..8].copy_from_slice(&flags.to_be_bytes());
+            assert!(udp_payload_to(&f, 67).is_none(), "fragment {flags:#06x}");
+        }
+        let mut tcp = p.clone();
+        tcp[9] = 6;
+        assert!(udp_payload_to(&tcp, 67).is_none());
+        // IPv6 and non-IPv4 versions are refused.
+        let mut v6 = p;
+        v6[0] = 0x60;
+        assert!(udp_payload_to(&v6, 67).is_none());
+    }
+
+    #[test]
+    fn trim_ipv4_rejects_bad_lengths() {
+        let p = udp_ipv4(
+            Ipv4Addr::new(10, 0, 0, 1),
+            Ipv4Addr::new(10, 0, 0, 2),
+            68,
+            67,
+            b"z",
+        );
+        assert_eq!(trim_ipv4(&p), Some(p.as_slice()));
+        let mut short = p.clone();
+        short[2..4].copy_from_slice(&19u16.to_be_bytes());
+        assert!(trim_ipv4(&short).is_none(), "total length below the header");
+        let mut long = p.clone();
+        long[2..4].copy_from_slice(&(p.len() as u16 + 1).to_be_bytes());
+        assert!(trim_ipv4(&long).is_none(), "total length beyond the frame");
     }
 }

@@ -31,7 +31,9 @@ cargo test --locked
 cargo build --locked --release
 ```
 
-CI runs these on Apple Silicon and Intel runners, and on the minimum supported Rust version.
+CI runs these on `macos-latest` (Apple Silicon), on `macos-15-intel`, and on the minimum supported Rust version (1.88, from `rust-version` in `Cargo.toml`). `cargo fmt --check` runs only on the stable toolchain. After the build it also runs a smoke test with no root and no phone: `--version`, `--help`, `devices --json` and `status --json`. CI sets `RUSTFLAGS=-D warnings`, so a warning fails the build locally only if you set the same.
+
+`cargo test` needs macOS but no phone and no root: it uses `/usr/bin/plutil` and `/bin/sleep`, and writes only to the temporary directory.
 
 ### Testing with a phone
 

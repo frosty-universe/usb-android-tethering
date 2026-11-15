@@ -1,8 +1,14 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Report a security vulnerability
-    url: https://github.com/frosty-universe/usb-android-tethering/security/advisories/new
-    about: Please report security issues privately, not as public issues.
+  - name: Website and step-by-step guide
+    url: https://frosty-universe.github.io/usb-android-tethering/
+    about: Installation, the phone settings and the Mac compatibility table.
+  - name: Frequently asked questions
+    url: https://github.com/frosty-universe/usb-android-tethering/blob/main/docs/FAQ.md
+    about: Common questions answered, including why this isn't a kernel extension.
+  - name: Security policy
+    url: https://github.com/frosty-universe/usb-android-tethering/blob/main/SECURITY.md
+    about: What runs as root, the trust boundaries and how to report a problem privately.
   - name: Troubleshooting guide
     url: https://github.com/frosty-universe/usb-android-tethering#troubleshooting
     about: Common problems and fixes

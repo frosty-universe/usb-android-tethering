@@ -30,6 +30,9 @@ pub fn spawn() {
 
 /// Blocks until `pid` exits, using kqueue so the guard costs nothing while it waits.
 fn wait_exit(pid: libc::pid_t) {
+    if pid <= 0 {
+        return;
+    }
     unsafe {
         let kq = libc::kqueue();
         if kq >= 0 {
@@ -38,38 +41,89 @@ fn wait_exit(pid: libc::pid_t) {
             ev.filter = libc::EVFILT_PROC;
             ev.flags = libc::EV_ADD | libc::EV_ONESHOT;
             ev.fflags = libc::NOTE_EXIT;
-            let registered =
-                libc::kevent(kq, &ev, 1, std::ptr::null_mut(), 0, std::ptr::null()) == 0;
+            let rc = libc::kevent(kq, &ev, 1, std::ptr::null_mut(), 0, std::ptr::null());
             // ESRCH: the process is already gone. Read errno before close() can change it.
-            let already_gone =
-                !registered && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
-            if registered {
+            let errno = (rc < 0).then(|| std::io::Error::last_os_error().raw_os_error());
+            let mut done = errno.flatten() == Some(libc::ESRCH);
+            if rc == 0 {
                 let mut out: libc::kevent = std::mem::zeroed();
-                while libc::kevent(kq, std::ptr::null(), 0, &mut out, 1, std::ptr::null()) < 0
-                    && std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted
-                {
+                loop {
+                    let n = libc::kevent(kq, std::ptr::null(), 0, &mut out, 1, std::ptr::null());
+                    if n > 0 {
+                        done = true;
+                        break;
+                    }
+                    if n < 0
+                        && std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted
+                    {
+                        continue;
+                    }
+                    // The watch was lost: never assume the process died, poll instead.
+                    break;
                 }
             }
             libc::close(kq);
-            if registered || already_gone {
+            if done {
                 return;
             }
         }
-        // Fallback: poll.
-        while libc::kill(pid, 0) == 0
-            || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
-        {
+        while alive(pid) {
             std::thread::sleep(Duration::from_millis(500));
         }
     }
 }
 
+fn alive(pid: libc::pid_t) -> bool {
+    let rc = unsafe { libc::kill(pid, 0) };
+    rc == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+}
+
 pub fn run(pid: u32) {
-    wait_exit(pid as libc::pid_t);
+    let Ok(pid) = libc::pid_t::try_from(pid) else {
+        return;
+    };
+    wait_exit(pid);
     // A newer instance (e.g. restarted by launchd) owns the network now: leave it alone.
     if state::read().is_some() {
         return;
     }
     tether::cleanup_leftovers();
     let _ = std::fs::remove_file(state::PATH);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Instant;
+
+    #[test]
+    fn alive_sees_a_running_process_only() {
+        assert!(alive(std::process::id() as libc::pid_t));
+        assert!(!alive(1_000_000_000));
+    }
+
+    #[test]
+    fn wait_exit_blocks_until_the_process_is_gone() {
+        let mut child = Command::new("/bin/sleep")
+            .arg("0.4")
+            .stdin(Stdio::null())
+            .spawn()
+            .expect("spawn /bin/sleep");
+        let started = Instant::now();
+        wait_exit(child.id() as libc::pid_t);
+        let elapsed = started.elapsed();
+        let _ = child.wait();
+        assert!(
+            elapsed >= Duration::from_millis(200),
+            "returned after {elapsed:?}, before the process exited"
+        );
+    }
+
+    #[test]
+    fn wait_exit_returns_at_once_for_an_invalid_pid() {
+        let started = Instant::now();
+        wait_exit(0);
+        wait_exit(-1);
+        assert!(started.elapsed() < Duration::from_millis(100));
+    }
 }
