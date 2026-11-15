@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Dependencies refreshed to the latest releases compatible with the Rust 1.88 minimum: `libc` 0.2.191, `log` 0.4.35, `serde_json` 1.0.154, plus transitive updates.
+- README: explicit Mac compatibility section for macOS 27 Golden Gate, 26 Tahoe, 15 Sequoia and 14 Sonoma; every Apple silicon generation (M1 through M6, A18 Pro MacBook Neo) and the Intel models still supported; star-history chart.
+- Comments: decorative section banners removed and long notes cut to one or two lines. No code changes.
+
+### Added
+
+- `.env.example`, `CLAUDE.md.example`, `AGENTS.md.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored.
+
 ## [0.1.0] - 2026-09-27
 
 First public release.

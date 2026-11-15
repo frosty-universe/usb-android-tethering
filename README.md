@@ -7,10 +7,10 @@
 **Plug in your phone, turn on USB tethering, and your Mac is online.**
 No kernel extension. No security downgrade. It works with your VPN.
 
-A free, open-source **HoRNDIS alternative** for **macOS Sonoma, Sequoia and Tahoe** on **Apple Silicon (M1, M2, M3, M4)** and Intel Macs.
-It supports RNDIS, CDC-NCM and CDC-ECM Android phones: Samsung Galaxy, Google Pixel, Xiaomi, OnePlus, Motorola and more.
+A free, open-source **HoRNDIS alternative** for **macOS 27 Golden Gate, 26 Tahoe, 15 Sequoia and 14 Sonoma** on every **Apple silicon** Mac (M1 through M6, plus the A18 Pro MacBook Neo) and on the Intel Macs those releases still support.
+It speaks RNDIS, CDC-NCM and CDC-ECM, so Samsung Galaxy, Google Pixel, Xiaomi, OnePlus, Motorola and other Android phones work.
 
-**[🌐 Website](https://frosty-universe.github.io/usb-android-tethering/)** · **[📥 Download](https://github.com/frosty-universe/usb-android-tethering/releases/latest)** · **[📖 Guide](#step-by-step)** · **[❓ FAQ](#faq)**
+**[🌐 Website](https://frosty-universe.github.io/usb-android-tethering/)** · **[📥 Download](https://github.com/frosty-universe/usb-android-tethering/releases/latest)** · **[📖 Guide](#step-by-step)** · **[🍎 Compatibility](#mac-compatibility)** · **[❓ FAQ](#faq)**
 
 [![CI](https://github.com/frosty-universe/usb-android-tethering/actions/workflows/ci.yml/badge.svg)](https://github.com/frosty-universe/usb-android-tethering/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/frosty-universe/usb-android-tethering?sort=semver)](https://github.com/frosty-universe/usb-android-tethering/releases/latest)
@@ -18,6 +18,8 @@ It supports RNDIS, CDC-NCM and CDC-ECM Android phones: Samsung Galaxy, Google Pi
 ![macOS: Apple Silicon + Intel](https://img.shields.io/badge/macOS-Apple%20Silicon%20%2B%20Intel-black?logo=apple)
 ![Written in Rust](https://img.shields.io/badge/written%20in-Rust-orange?logo=rust)
 [![GitHub stars](https://img.shields.io/github/stars/frosty-universe/usb-android-tethering?style=social)](https://github.com/frosty-universe/usb-android-tethering/stargazers)
+
+<a href="https://star-history.com/#frosty-universe/usb-android-tethering&Date"><img alt="Star history" src="https://api.star-history.com/svg?repos=frosty-universe/usb-android-tethering&type=Date" height="160"></a>
 
 </div>
 
@@ -151,6 +153,36 @@ The phone shows up to macOS the way a USB Ethernet dongle does, at every layer a
 | Kernel | A real Ethernet interface (a `feth` pair) with its own MAC and ARP, not a layer-3 tunnel |
 
 Under the hood the tool is a userspace USB driver bridging the phone to that interface. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+<a id="mac-compatibility"></a>
+## 🍎 Mac compatibility
+
+The tool needs a Mac that runs macOS 11 or later, and it follows macOS itself: if macOS runs on your Mac, so does this.
+
+**macOS versions**
+
+| macOS | Latest release | Macs | Notes |
+|---|---|---|---|
+| **27 Golden Gate** | 27.2.1 | Apple silicon only | First Apple-silicon-only release. Tested. |
+| **26 Tahoe** | 26.7.3 | Apple silicon + 4 Intel models | Last release for Intel Macs. Tested. |
+| **15 Sequoia** | 15.8.3 | Apple silicon + Intel | Supported |
+| **14 Sonoma** | 14.8.9 | Apple silicon + Intel | Supported; no longer receiving regular updates from Apple |
+
+**Apple silicon**
+
+| Chip | Macs |
+|---|---|
+| **M1** | MacBook Air (2020), MacBook Pro 13″ (2020), Mac mini (2020), iMac 24″ (2021), MacBook Pro 14″/16″ (2021) |
+| **M2 / M2 Pro / M2 Max / M2 Ultra** | MacBook Air 13″/15″ (2022–23), MacBook Pro 13″ (2022), MacBook Pro 14″/16″ (2023), Mac mini (2023), Mac Studio (2023), Mac Pro (2023) |
+| **M3 / M3 Pro / M3 Max / M3 Ultra** | MacBook Pro 14″/16″ (2023), iMac 24″ (2023), MacBook Air 13″/15″ (2024), Mac Studio (2025) |
+| **M4 / M4 Pro / M4 Max** | MacBook Pro 14″/16″ (2024), iMac 24″ (2024), Mac mini (2024), MacBook Air 13″/15″ (2025), Mac Studio (2025) |
+| **M5 / M5 Pro / M5 Max / M5 Ultra** | MacBook Pro 14″ (2025), MacBook Pro 14″/16″ (2026), MacBook Air 13″/15″ (2026), Mac mini (2026), Mac Studio (2026) |
+| **M6** | MacBook Pro 14″ (2026), iMac 24″ (2026), Mac mini (2026) |
+| **A18 Pro** | MacBook Neo (2026) |
+
+**Intel Macs** work on macOS 26 Tahoe and earlier: MacBook Pro 16″ (2019), MacBook Pro 13″ (2020, four Thunderbolt 3 ports), iMac 27″ (2020), Mac Pro (2019). They cannot run macOS 27.
+
+The universal binary runs natively on both architectures. There is no Apple-silicon-only build and no Rosetta requirement.
 
 ## 📱 Device support
 

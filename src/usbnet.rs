@@ -263,9 +263,6 @@ pub fn find_all() -> Result<Vec<Found>> {
     Ok(out)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Framing
-
 /// How Ethernet frames are wrapped in USB transfers for the phone's protocol.
 #[derive(Clone, Copy, Debug)]
 pub enum Framing {
@@ -355,9 +352,6 @@ impl Framing {
         }
     }
 }
-
-// ---------------------------------------------------------------------------------------------
-// Opened device
 
 /// An opened, initialised tethering function.
 pub struct Device {
@@ -497,7 +491,6 @@ impl Drop for Device {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
 // Phones we can't (or needn't) drive, with advice
 
 /// A phone that is attached but not tethering through this tool right now.

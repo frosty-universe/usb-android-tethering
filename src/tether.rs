@@ -98,9 +98,8 @@ impl Link {
         let Some(eth) = net::parse_eth(f) else {
             return false;
         };
-        // Point-to-point link: every unicast frame from the phone is meant for us. Some phones
-        // and modems (e.g. ZTE) put a wrong destination MAC on them; like Linux's
-        // DST_MAC_FIXUP quirk, rewrite it rather than drop the frame (copy only in that case).
+        // Point-to-point link, so every unicast frame is ours. Some phones (e.g. ZTE) put a wrong
+        // destination MAC on them; rewrite it like Linux's DST_MAC_FIXUP quirk instead of dropping.
         let fixed;
         let f = if net::is_unicast(&eth.dst) && eth.dst != self.mac {
             let mut v = f.to_vec();
@@ -292,9 +291,8 @@ fn session(found: &usbnet::Found, opts: &Options) -> Result<()> {
         // macOS's very first DHCP exchange can't race the data path.
         nic.bring_up()?;
 
-        // macOS now runs DHCP. If it hasn't produced a real (non-link-local) address after
-        // 10 s, bounce the link to restart DHCP immediately instead of waiting for macOS's
-        // long retry backoff.
+        // macOS runs DHCP now. Without a real address after 10 s, bounce the link to restart it
+        // rather than wait out macOS's long retry backoff.
         let started = Instant::now();
         let mut last_kick = started;
         let info = loop {

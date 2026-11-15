@@ -1,0 +1,21 @@
+# CLAUDE.md.example
+# Copy to CLAUDE.md (gitignored) and adapt. Keep it under ~100 lines.
+
+## Project
+usb-android-tethering: a userspace Rust driver that exposes an Android phone's USB
+tethering (RNDIS, CDC-NCM, CDC-ECM) to macOS as a real Ethernet adapter. Read
+docs/ARCHITECTURE.md, especially the Invariants section, before touching teardown
+order, USB transfer ownership or the network-service lifecycle.
+
+## Commands
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo build --release
+sudo ./target/release/usb-android-tethering -vv   # hardware run, Ctrl+C restores
+
+## Rules
+- The data path must not allocate per packet or wake on a timer while idle.
+- Parsing runs on device-controlled bytes: bounds-check, never panic.
+- Unsafe is only for FFI; each block says why it is sound.
+- Do not run adb as root. Do not detach a native macOS driver.

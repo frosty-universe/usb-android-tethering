@@ -254,9 +254,8 @@ impl Feth {
         let _ = unsafe { libc::write(self.wake_w.as_raw_fd(), [1u8].as_ptr().cast(), 1) };
     }
 
-    /// Blocks until macOS transmits frames (or [`Self::interrupt`] is called) and records where
-    /// each frame lies in `buf`; one read returns a whole batch. `buf` must be
-    /// [`Self::read_buf_len`] long. Returns false when interrupted.
+    /// Blocks until macOS transmits frames, or [`Self::interrupt`] fires (returns false).
+    /// Records each frame's position in `buf`, which must be [`Self::read_buf_len`] long.
     pub fn read_batch(&self, buf: &mut [u8], frames: &mut Vec<Range<usize>>) -> io::Result<bool> {
         frames.clear();
         let mut pfd = [
@@ -298,9 +297,8 @@ impl Feth {
     }
 }
 
-/// Splits a BPF read into frames. Records are
-/// `struct bpf_hdr { timeval32 tstamp; u32 caplen; u32 datalen; u16 hdrlen; }` + data,
-/// each padded to a 4-byte boundary (BPF_WORDALIGN).
+/// Splits a BPF read into frames: `bpf_hdr { timeval32 tstamp; u32 caplen; u32 datalen; u16 hdrlen; }`
+/// plus data, each record padded to 4 bytes (BPF_WORDALIGN).
 fn parse_bpf(buf: &[u8], frames: &mut Vec<Range<usize>>) {
     let n = buf.len();
     let mut off = 0;

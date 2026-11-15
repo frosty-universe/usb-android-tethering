@@ -1,0 +1,6 @@
+# AGENTS.md.example
+# Copy to AGENTS.md (gitignored) when using other coding agents.
+
+Same contract as CLAUDE.md.example: the invariants in docs/ARCHITECTURE.md are
+the review bar. Run fmt, clippy (-D warnings) and tests before proposing a change.
+Hardware changes need a real-phone run and a note in the PR saying what was tested.

@@ -1,9 +1,16 @@
 # Build output
 /target
 
-# Local tooling and personal files (never published)
+# Local tooling, secrets and personal files (never published)
+.env
+.env.*
+!.env.example
+/AGENTS.md
 /CLAUDE.md
+/CLAUDE.local.md
+/.claude/
 /.remember/
 /removed-droidtether-backup/
 .DS_Store
 *.swp
+*.log

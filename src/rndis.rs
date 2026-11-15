@@ -53,9 +53,8 @@ pub struct TxLimits {
 }
 
 impl TxLimits {
-    /// Reads the phone's limits from REMOTE_NDIS_INITIALIZE_CMPLT: type @0, length @4, id @8,
-    /// status @12, major @16, minor @20, flags @24, medium @28, MaxPacketsPerTransfer @32,
-    /// MaxTransferSize @36, PacketAlignmentFactor @40 (a power of two exponent).
+    /// Reads the phone's limits from INITIALIZE_CMPLT: MaxPacketsPerTransfer @32,
+    /// MaxTransferSize @36, PacketAlignmentFactor @40 (2^n).
     fn apply_init_cmplt(&mut self, r: &[u8]) {
         if r.len() >= 44 {
             self.max_pkts = (le32(r, 32) as usize).clamp(1, 32);
@@ -75,19 +74,16 @@ impl TxLimits {
         self.pack_with(frames.len(), |i| frames[i], out)
     }
 
-    /// Packs frames `frame(0..count)` (from the front) into `out` as consecutive
-    /// RNDIS_PACKET_MSGs, within the phone's limits. Taking a closure lets callers pack straight
-    /// from a receive buffer without collecting slices first. Returns (bytes, frames consumed);
-    /// consumes at least one frame when `count > 0` and `out` holds [`Self::buf_len`] bytes.
+    /// Packs frames `frame(0..count)` into `out` as consecutive RNDIS_PACKET_MSGs, within the
+    /// phone's limits. The closure avoids collecting slices first. Returns (bytes, frames).
     pub fn pack_with<'a>(
         &self,
         count: usize,
         frame: impl Fn(usize) -> &'a [u8],
         out: &mut [u8],
     ) -> (usize, usize) {
-        // One spare byte so the transfer can always be kept off a max-packet boundary.
-        // `soft`: the phone's limit, applied when aggregating. `hard`: the buffer, which bounds
-        // a lone frame (a phone announcing a tiny limit still gets one full frame per transfer).
+        // One spare byte keeps the transfer off a max-packet boundary (no zero-length packet).
+        // `soft` is the phone's limit when aggregating; `hard` is the buffer, which bounds a lone frame.
         let hard = out.len() - 1;
         let soft = self.max_xfer.min(out.len()) - 1;
         let (mut len, mut used, mut last) = (0, 0, 0);

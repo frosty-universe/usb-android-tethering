@@ -17,10 +17,10 @@ include = ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "CHANGELOG.md", "L
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
 ctrlc = { version = "3.5.2", features = ["termination"] }
-libc = "0.2.189"
-log = { version = "0.4.34", features = ["std"] }
+libc = "0.2.191"
+log = { version = "0.4.35", features = ["std"] }
 rusb = { version = "0.9.4", features = ["vendored"] }
-serde_json = "1.0.151"
+serde_json = "1.0.154"
 
 [profile.release]
 lto = true

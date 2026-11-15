@@ -87,9 +87,8 @@ impl Params {
         self.out_max.max(2048)
     }
 
-    /// Packs frames from the front of `0..count` (`frame(i)`) into one NTB16 in `out`.
-    /// Returns (bytes, frames consumed). A frame too large to fit even alone is dropped
-    /// (consumed with 0 bytes) rather than wedging the queue.
+    /// Packs frames `frame(0..count)` into one NTB16. Returns (bytes, frames consumed); a frame
+    /// too large to fit alone is dropped rather than wedging the queue.
     pub fn pack_with<'a>(
         &self,
         count: usize,
@@ -190,9 +189,8 @@ pub fn parse_ntb(buf: &[u8], mut on_frame: impl FnMut(&[u8])) {
     }
 }
 
-/// NCM control setup on a claimed function (data interface still at alt setting 0):
-/// reads the NTB parameters, asks for NTBs no larger than our buffers, and sets a packet
-/// filter. Only GET_NTB_PARAMETERS is mandatory; the rest is best effort.
+/// NCM setup on a claimed function, before the data alt setting is selected. Reads the NTB
+/// parameters (the only mandatory step), then caps NTB size and sets a filter, best effort.
 pub fn setup(h: &DeviceHandle<GlobalContext>, ctrl_if: u8, out_mps: usize) -> Result<Params> {
     let idx = ctrl_if as u16;
     let mut p = [0u8; 28];

@@ -17,7 +17,6 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, Once};
 use std::time::{Duration, Instant};
 
-// ---------------------------------------------------------------------------------------------
 // Event thread + hotplug
 
 static CHANGES: Mutex<u64> = Mutex::new(0);
@@ -80,7 +79,6 @@ pub fn change_count() -> u64 {
     *CHANGES.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-// ---------------------------------------------------------------------------------------------
 // Shared transfer bookkeeping
 
 type Fatal = Box<dyn Fn(&str) + Send + Sync>;
@@ -149,9 +147,6 @@ fn drain(ts: &[*mut ffi::libusb_transfer], inflight: &AtomicUsize) -> bool {
     }
     true
 }
-
-// ---------------------------------------------------------------------------------------------
-// Receive ring
 
 struct RxShared {
     stopping: AtomicBool,
@@ -241,9 +236,6 @@ impl Drop for RxRing {
         }
     }
 }
-
-// ---------------------------------------------------------------------------------------------
-// Transmit pool
 
 struct TxShared {
     stopping: AtomicBool,
