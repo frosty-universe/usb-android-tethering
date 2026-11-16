@@ -23,27 +23,28 @@ It speaks RNDIS, CDC-NCM and CDC-ECM, so Samsung Galaxy, Google Pixel, Xiaomi, O
 
 </div>
 
-## ⚡ Install in one command
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh
-```
-
-This builds the latest tagged source with Rust (1.88+) and installs a background service. No prebuilt binary is published. You'll be asked for your password once. Then [enable USB tethering on your phone](#step-2) and you're online. [Homebrew](#with-homebrew) builds the same source and installs Rust for you.
-
-<sub>Prefer to read the script first? It's short: <a href="install.sh"><code>install.sh</code></a>. Or <a href="#build-from-source">build from source</a>.</sub>
-
-<a id="with-homebrew"></a>
-### With Homebrew
+## ⚡ Install with Homebrew
 
 ```sh
 brew install frosty-universe/usb-android-tethering/usb-android-tethering
 sudo usb-android-tethering install
 ```
 
-The formula builds from the tagged source with your Rust toolchain, so `brew upgrade` picks up every new release. It lives in a [tap](https://github.com/frosty-universe/homebrew-usb-android-tethering), not in homebrew-core, so the fully qualified name is needed the first time. See [docs/HOMEBREW.md](docs/HOMEBREW.md) for upgrading, auditing and how the tap is updated on each release.
+This builds the latest tagged source, installs the background service, and asks for your password once. Then [enable USB tethering on your phone](#step-2) and you're online. The formula lives in a [tap](https://github.com/frosty-universe/homebrew-usb-android-tethering), not in homebrew-core, so use the fully qualified name above the first time. See [docs/HOMEBREW.md](docs/HOMEBREW.md) for upgrades and auditing.
 
-`brew services` is not used: the daemon needs root, so `sudo usb-android-tethering install` writes the launchd job and the network service itself. Remove everything with `sudo usb-android-tethering uninstall --purge`.
+`brew services` is not used: the daemon needs root, so `sudo usb-android-tethering install` writes the launchd job and network service itself. Remove everything with `sudo usb-android-tethering uninstall --purge`.
+
+### Alternative: source install
+
+If Rust 1.88+ is already installed:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh
+```
+
+The script builds the tagged source locally. No prebuilt binary is published.
+
+<sub>Prefer to read the script first? It's short: <a href="install.sh"><code>install.sh</code></a>. Or <a href="#build-from-source">build from source</a>.</sub>
 
 ---
 
@@ -132,6 +133,15 @@ this README makes no claim about relative speed.
 
 ### Step 1 — Install
 
+Recommended, Homebrew:
+
+```sh
+brew install frosty-universe/usb-android-tethering/usb-android-tethering
+sudo usb-android-tethering install
+```
+
+This builds the tagged source and installs the service. If Rust 1.88+ is already installed, the source installer is also available:
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh
 ```
@@ -169,7 +179,10 @@ Connect your VPN after the phone is online, and it runs over the tether exactly 
 ### Step 5 — Update or uninstall
 
 ```sh
-# Update to the latest release (same command as installing)
+# Update with Homebrew
+brew update && brew upgrade frosty-universe/usb-android-tethering/usb-android-tethering
+
+# Or update from source when Rust 1.88+ is installed
 curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh
 
 # Uninstall completely (service, network entry, binary, logs)
