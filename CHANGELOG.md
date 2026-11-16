@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Dependencies refreshed to the latest releases compatible with the Rust 1.88 minimum: `libc` 0.2.191, `log` 0.4.35, `serde_json` 1.0.154, plus transitive updates.
-- README: explicit Mac compatibility section for macOS 27 Golden Gate, 26 Tahoe, 15 Sequoia and 14 Sonoma; every Apple silicon generation (M1 through M6, A18 Pro MacBook Neo) and the Intel models still supported; star-history chart.
+- README: Mac compatibility section for macOS 27 Golden Gate, 26 Tahoe, 15 Sequoia and 14 Sonoma, covering Apple silicon and the Intel models those releases still support; star-history chart.
 - Comments: decorative section banners removed and long notes cut to one or two lines. No code changes.
 
 ### Added
@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `scripts/check-install.sh`, a no-root check that downloads a release, verifies its checksum and runs the binary.
 - `.env.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored; `AGENTS.md` points at `CLAUDE.md`, which `scripts/merge-claude-md.sh` maintains from `scripts/claude-antislop.md` behind a hash guard that never overwrites local edits.
 - docs/COMPATIBILITY.md and docs/FAQ.md.
-- Compatibility pages now state what the code actually guarantees (macOS 11 or later, any Apple silicon Mac, the four Intel models that reach macOS 26) instead of enumerating point releases and chip-to-model pairings that go stale. macOS 27.2 is confirmed on an A18 Pro MacBook Neo.
+- Compatibility pages now state what the code actually guarantees (macOS 11 or later, any Apple silicon Mac, the four Intel models that reach macOS 26) instead of enumerating point releases and chip-to-model pairings that go stale. macOS 27.2 is confirmed on this machine (A18 Pro MacBook Neo).
 
 ### Removed
 

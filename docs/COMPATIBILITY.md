@@ -11,7 +11,7 @@ The binary's deployment target is macOS 11.0 (visible as `minos 11.0` in its `LC
 | macOS | Macs | Status |
 |---|---|---|
 | **27 Golden Gate** | Apple silicon only | Tested on 27.2. First Apple-silicon-only release. |
-| **26 Tahoe** | Apple silicon and four Intel models | Tested. Last release for Intel Macs. |
+| **26 Tahoe** | Apple silicon and four Intel models | Last release for Intel Macs. |
 | **15 Sequoia** | Apple silicon and Intel | Supported. |
 | **14 Sonoma** | Apple silicon and Intel | Supported. Apple no longer ships regular updates for it. |
 | **11 Big Sur to 13 Ventura** | Apple silicon and Intel | Expected to work (the binary's deployment target is 11.0), but not part of the documented test matrix. |

@@ -172,8 +172,8 @@ The tool needs a Mac that runs macOS 11 or later, and it follows macOS itself: i
 
 | macOS | Macs | Notes |
 |---|---|---|
-| **27 Golden Gate** | Apple silicon only | First Apple-silicon-only release. Tested on 27.2. |
-| **26 Tahoe** | Apple silicon + 4 Intel models | Last release for Intel Macs. Tested. |
+| **27 Golden Gate** | Apple silicon only | Tested on 27.2. First Apple-silicon-only release. |
+| **26 Tahoe** | Apple silicon + 4 Intel models | Last release for Intel Macs |
 | **15 Sequoia** | Apple silicon + Intel | Supported |
 | **14 Sonoma** | Apple silicon + Intel | Supported; no longer receiving regular updates from Apple |
 
