@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-16
 
 ### Changed
 
@@ -29,7 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A failed USB setup could leave an interface claimed until the handle was dropped; both interfaces are now released on every error path.
 - `RxRing::start` leaked its transfers if a later submit failed; the ring is now dropped, which cancels and frees them.
-- Hardened the engine and protocol paths against panics from device-controlled input, and added tests for state, logging, guard, NCM/RNDIS packing, scutil parsing and BPF record parsing (67 tests).
+- Hardened the engine and protocol paths against panics from device-controlled input, and added tests for state, logging, guard, NCM/RNDIS packing, scutil parsing and BPF record parsing (80 tests).
 
 ## [0.1.0] - 2026-09-27
 
