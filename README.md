@@ -146,7 +146,7 @@ This builds the tagged source and installs the service. If Rust 1.88+ is already
 curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh
 ```
 
-You need a Mac running macOS 11 or later (Apple silicon or Intel, see [Mac compatibility](#mac-compatibility)) and your password once. The service then starts automatically at every boot.
+You need a Mac running macOS 11 or later (Apple silicon or Intel, see [Mac compatibility](#mac-compatibility)) and your password once. The service starts automatically at every boot.
 
 <a id="step-2"></a>
 ### Step 2 — Turn on USB tethering on the phone
