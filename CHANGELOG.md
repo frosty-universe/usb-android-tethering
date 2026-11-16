@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `scripts/check-install.sh`, a no-root check that downloads a release, verifies its checksum and runs the binary.
 - `.env.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored; `AGENTS.md` points at `CLAUDE.md`, which `scripts/merge-claude-md.sh` maintains from `scripts/claude-antislop.md` behind a hash guard that never overwrites local edits.
 - docs/COMPATIBILITY.md and docs/FAQ.md.
+- Compatibility pages now state what the code actually guarantees (macOS 11 or later, any Apple silicon Mac, the four Intel models that reach macOS 26) instead of enumerating point releases and chip-to-model pairings that go stale. macOS 27.2 is confirmed on an A18 Pro MacBook Neo.
 
 ### Removed
 

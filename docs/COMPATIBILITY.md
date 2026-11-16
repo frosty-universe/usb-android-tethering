@@ -8,35 +8,23 @@ The short version: **if macOS runs on your Mac, this tool runs on your Mac.** It
 
 The binary's deployment target is macOS 11.0 (visible as `minos 11.0` in its `LC_BUILD_VERSION` load command), so it loads on macOS 11 and later. The releases below are the ones the project documents and tests against.
 
-| macOS | Latest release at time of writing | Macs | Status |
-|---|---|---|---|
-| **27 Golden Gate** | 27.2.1 | Apple silicon only | Tested. First Apple-silicon-only release. |
-| **26 Tahoe** | 26.7.3 | Apple silicon and four Intel models | Tested. Last release for Intel Macs. |
-| **15 Sequoia** | 15.8.3 | Apple silicon and Intel | Supported. |
-| **14 Sonoma** | 14.8.9 | Apple silicon and Intel | Supported. Apple no longer ships regular updates for it. |
-| **11 Big Sur to 13 Ventura** | (final releases) | Apple silicon and Intel | Expected to work (the binary's deployment target is 11.0), but not part of the documented test matrix. |
+| macOS | Macs | Status |
+|---|---|---|
+| **27 Golden Gate** | Apple silicon only | Tested on 27.2. First Apple-silicon-only release. |
+| **26 Tahoe** | Apple silicon and four Intel models | Tested. Last release for Intel Macs. |
+| **15 Sequoia** | Apple silicon and Intel | Supported. |
+| **14 Sonoma** | Apple silicon and Intel | Supported. Apple no longer ships regular updates for it. |
+| **11 Big Sur to 13 Ventura** | Apple silicon and Intel | Expected to work (the binary's deployment target is 11.0), but not part of the documented test matrix. |
 
 Nothing in the code branches on the macOS version. The features it depends on (`feth`, BPF, SystemConfiguration preferences, `launchctl bootstrap`) have existed for far longer than macOS 11.
 
 ## Apple silicon
 
-Every Apple silicon Mac runs every macOS release from its introduction onward, and this tool runs on all of them.
-
-| Chip | Macs |
-|---|---|
-| **M1** | MacBook Air (2020), MacBook Pro 13-inch (2020), Mac mini (2020), iMac 24-inch (2021), MacBook Pro 14/16-inch (2021) |
-| **M2 / M2 Pro / M2 Max / M2 Ultra** | MacBook Air 13/15-inch (2022–23), MacBook Pro 13-inch (2022), MacBook Pro 14/16-inch (2023), Mac mini (2023), Mac Studio (2023), Mac Pro (2023) |
-| **M3 / M3 Pro / M3 Max / M3 Ultra** | MacBook Pro 14/16-inch (2023), iMac 24-inch (2023), MacBook Air 13/15-inch (2024), Mac Studio (2025) |
-| **M4 / M4 Pro / M4 Max** | MacBook Pro 14/16-inch (2024), iMac 24-inch (2024), Mac mini (2024), MacBook Air 13/15-inch (2025), Mac Studio (2025) |
-| **M5 / M5 Pro / M5 Max / M5 Ultra** | MacBook Pro 14-inch (2025), MacBook Pro 14/16-inch (2026), MacBook Air 13/15-inch (2026), Mac mini (2026), Mac Studio (2026) |
-| **M6** | MacBook Pro 14-inch (2026), iMac 24-inch (2026), Mac mini (2026) |
-| **A18 Pro** | MacBook Neo (2026) |
-
-The A18 Pro MacBook Neo runs macOS on an iPhone-class SoC. Nothing in this tool depends on the CPU family, so it is supported the same way as the M-series Macs.
-
-## Intel Macs
+Every Apple silicon Mac runs every macOS release from its introduction onward, and this tool runs on all of them. Nothing in the code depends on the CPU family: it uses `feth`, BPF, `scutil` and libusb, which are the same on an M-series Mac as on the A-series MacBook Neo. There is no chip to look up.
 
 Intel Macs work on macOS 26 Tahoe and earlier. They cannot run macOS 27.
+
+## Intel Macs
 
 | Model | Notes |
 |---|---|

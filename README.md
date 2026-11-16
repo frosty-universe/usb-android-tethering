@@ -7,7 +7,7 @@
 **Plug in your phone, turn on USB tethering, and your Mac is online.**
 No kernel extension. No security downgrade. It works with your VPN.
 
-A free, open-source **HoRNDIS alternative** for **macOS 27 Golden Gate, 26 Tahoe, 15 Sequoia and 14 Sonoma** on every **Apple silicon** Mac (M1 through M6, plus the A18 Pro MacBook Neo) and on the Intel Macs those releases still support.
+A free, open-source **HoRNDIS alternative** for **macOS 27 Golden Gate, 26 Tahoe, 15 Sequoia and 14 Sonoma** on every **Apple silicon** Mac and on the Intel Macs those releases still support.
 It speaks RNDIS, CDC-NCM and CDC-ECM, so Samsung Galaxy, Google Pixel, Xiaomi, OnePlus, Motorola and other Android phones work.
 
 **[🌐 Website](https://frosty-universe.github.io/usb-android-tethering/)** · **[📥 Download](https://github.com/frosty-universe/usb-android-tethering/releases/latest)** · **[📖 Guide](#step-by-step)** · **[🍎 Compatibility](#mac-compatibility)** · **[❓ FAQ](#faq)**
@@ -170,24 +170,14 @@ The tool needs a Mac that runs macOS 11 or later, and it follows macOS itself: i
 
 **macOS versions**
 
-| macOS | Latest release | Macs | Notes |
-|---|---|---|---|
-| **27 Golden Gate** | 27.2.1 | Apple silicon only | First Apple-silicon-only release. Tested. |
-| **26 Tahoe** | 26.7.3 | Apple silicon + 4 Intel models | Last release for Intel Macs. Tested. |
-| **15 Sequoia** | 15.8.3 | Apple silicon + Intel | Supported |
-| **14 Sonoma** | 14.8.9 | Apple silicon + Intel | Supported; no longer receiving regular updates from Apple |
+| macOS | Macs | Notes |
+|---|---|---|
+| **27 Golden Gate** | Apple silicon only | First Apple-silicon-only release. Tested on 27.2. |
+| **26 Tahoe** | Apple silicon + 4 Intel models | Last release for Intel Macs. Tested. |
+| **15 Sequoia** | Apple silicon + Intel | Supported |
+| **14 Sonoma** | Apple silicon + Intel | Supported; no longer receiving regular updates from Apple |
 
-**Apple silicon**
-
-| Chip | Macs |
-|---|---|
-| **M1** | MacBook Air (2020), MacBook Pro 13″ (2020), Mac mini (2020), iMac 24″ (2021), MacBook Pro 14″/16″ (2021) |
-| **M2 / M2 Pro / M2 Max / M2 Ultra** | MacBook Air 13″/15″ (2022–23), MacBook Pro 13″ (2022), MacBook Pro 14″/16″ (2023), Mac mini (2023), Mac Studio (2023), Mac Pro (2023) |
-| **M3 / M3 Pro / M3 Max / M3 Ultra** | MacBook Pro 14″/16″ (2023), iMac 24″ (2023), MacBook Air 13″/15″ (2024), Mac Studio (2025) |
-| **M4 / M4 Pro / M4 Max** | MacBook Pro 14″/16″ (2024), iMac 24″ (2024), Mac mini (2024), MacBook Air 13″/15″ (2025), Mac Studio (2025) |
-| **M5 / M5 Pro / M5 Max / M5 Ultra** | MacBook Pro 14″ (2025), MacBook Pro 14″/16″ (2026), MacBook Air 13″/15″ (2026), Mac mini (2026), Mac Studio (2026) |
-| **M6** | MacBook Pro 14″ (2026), iMac 24″ (2026), Mac mini (2026) |
-| **A18 Pro** | MacBook Neo (2026) |
+**Apple silicon** — every Apple silicon Mac: M1, M2, M3, M4, M5, M6 (and their Pro/Max/Ultra variants), plus the A18 Pro MacBook Neo. Nothing in the code depends on the CPU family, so there is no chip to check.
 
 **Intel Macs** work on macOS 26 Tahoe and earlier: MacBook Pro 16″ (2019), MacBook Pro 13″ (2020, four Thunderbolt 3 ports), iMac 27″ (2020), Mac Pro (2019). They cannot run macOS 27.
 
