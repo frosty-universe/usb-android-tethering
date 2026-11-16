@@ -28,7 +28,7 @@ The script downloads the tag's source tarball, computes its SHA-256, writes the 
 1. Create a fine-grained personal access token with **Contents: Read and write** on the tap repository only.
 2. Add it as `TAP_TOKEN` in the main repository: Settings → Secrets and variables → Actions → New repository secret.
 
-Without the secret the step logs a warning and is skipped, and the tap stays at its last version; use the manual path above until it is set. With it, every tag `vX.Y.Z` updates the formula, so users get the new version with `brew update && brew upgrade`.
+The secret is not set yet, so the step logs a warning and skips; update the tap by hand (above) after each release until it is. Once set, every tag `vX.Y.Z` updates the formula, so users get the new version with `brew update && brew upgrade`.
 
 ## Checking a formula by hand
 
