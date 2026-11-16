@@ -170,16 +170,18 @@ The tool needs a Mac that runs macOS 11 or later, and it follows macOS itself: i
 
 **macOS versions**
 
-| macOS | Macs | Notes |
-|---|---|---|
-| **27 Golden Gate** | Apple silicon only | Tested on 27.2. First Apple-silicon-only release. |
-| **26 Tahoe** | Apple silicon + 4 Intel models | Last release for Intel Macs |
-| **15 Sequoia** | Apple silicon + Intel | Supported |
-| **14 Sonoma** | Apple silicon + Intel | Supported; no longer receiving regular updates from Apple |
+| macOS | Latest | Macs | Notes |
+|---|---|---|---|
+| **27 Golden Gate** | 27.2.1 | Apple silicon only | Tested on 27.2. First Apple-silicon-only release. |
+| **26 Tahoe** | 26.7.3 | Apple silicon + 4 Intel models | Last release for Intel Macs |
+| **15 Sequoia** | 15.8.3 | Apple silicon + Intel | Supported |
+| **14 Sonoma** | 14.8.9 | Apple silicon + Intel | Supported; no longer receiving regular updates from Apple |
 
 **Apple silicon** — every Apple silicon Mac: M1, M2, M3, M4, M5, M6 (and their Pro/Max/Ultra variants), plus the A18 Pro MacBook Neo. Nothing in the code depends on the CPU family, so there is no chip to check.
 
-**Intel Macs** work on macOS 26 Tahoe and earlier: MacBook Pro 16″ (2019), MacBook Pro 13″ (2020, four Thunderbolt 3 ports), iMac 27″ (2020), Mac Pro (2019). They cannot run macOS 27.
+**Intel Macs** work on macOS 26 Tahoe and earlier: MacBook Pro 16″ (2019), MacBook Pro 13″ (2020, four Thunderbolt ports), iMac (2020), Mac Pro (2019). They cannot run macOS 27.
+
+Version numbers from [Apple's security releases page](https://support.apple.com/en-us/100100); model lists from [macOS 27 compatibility](https://support.apple.com/en-us/127255).
 
 The universal binary runs natively on both architectures. There is no Apple-silicon-only build and no Rosetta requirement.
 

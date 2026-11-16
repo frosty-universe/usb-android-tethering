@@ -8,29 +8,31 @@ The short version: **if macOS runs on your Mac, this tool runs on your Mac.** It
 
 The binary's deployment target is macOS 11.0 (visible as `minos 11.0` in its `LC_BUILD_VERSION` load command), so it loads on macOS 11 and later. The releases below are the ones the project documents and tests against.
 
-| macOS | Macs | Status |
-|---|---|---|
-| **27 Golden Gate** | Apple silicon only | Tested on 27.2. First Apple-silicon-only release. |
-| **26 Tahoe** | Apple silicon and four Intel models | Last release for Intel Macs. |
-| **15 Sequoia** | Apple silicon and Intel | Supported. |
-| **14 Sonoma** | Apple silicon and Intel | Supported. Apple no longer ships regular updates for it. |
-| **11 Big Sur to 13 Ventura** | Apple silicon and Intel | Expected to work (the binary's deployment target is 11.0), but not part of the documented test matrix. |
+| macOS | Latest release | Macs | Status |
+|---|---|---|---|
+| **27 Golden Gate** | 27.2.1 | Apple silicon only | Tested on 27.2. First Apple-silicon-only release. |
+| **26 Tahoe** | 26.7.3 | Apple silicon and four Intel models | Last release for Intel Macs. |
+| **15 Sequoia** | 15.8.3 | Apple silicon and Intel | Supported. |
+| **14 Sonoma** | 14.8.9 | Apple silicon and Intel | Supported. Apple no longer ships regular updates for it. |
+| **11 Big Sur to 13 Ventura** | (final releases) | Apple silicon and Intel | Expected to work (the binary's deployment target is 11.0), but not part of the documented test matrix. |
 
 Nothing in the code branches on the macOS version. The features it depends on (`feth`, BPF, SystemConfiguration preferences, `launchctl bootstrap`) have existed for far longer than macOS 11.
 
+Version numbers are from [Apple's security releases page](https://support.apple.com/en-us/100100).
+
 ## Apple silicon
 
-Every Apple silicon Mac runs every macOS release from its introduction onward, and this tool runs on all of them. Nothing in the code depends on the CPU family: it uses `feth`, BPF, `scutil` and libusb, which are the same on an M-series Mac as on the A-series MacBook Neo. There is no chip to look up.
+Every Apple silicon Mac runs every macOS release from its introduction onward, and this tool runs on all of them. Nothing in the code depends on the CPU family: it uses `feth`, BPF, `scutil` and libusb, which behave the same on an M-series Mac and on the A-series MacBook Neo.
 
-Intel Macs work on macOS 26 Tahoe and earlier. They cannot run macOS 27.
+macOS 27, the current release, covers these families: M1, M2, M3, M4, M5 and M6 (with their Pro, Max and Ultra variants), plus the A18 Pro in the 13-inch MacBook Neo. The full model list is on [Apple's macOS 27 compatibility page](https://support.apple.com/en-us/127255).
 
 ## Intel Macs
 
 | Model | Notes |
 |---|---|
 | MacBook Pro 16-inch (2019) | Supported through macOS 26 |
-| MacBook Pro 13-inch (2020, four Thunderbolt 3 ports) | Supported through macOS 26 |
-| iMac 27-inch (2020) | Supported through macOS 26 |
+| MacBook Pro 13-inch (2020, four Thunderbolt ports) | Supported through macOS 26 |
+| iMac (2020) | Supported through macOS 26 |
 | Mac Pro (2019) | Supported through macOS 26 |
 
 The release archive contains a **universal binary** (arm64 and x86_64, combined with `lipo`). It runs natively on both architectures: there is no separate Intel build and no Rosetta requirement.
