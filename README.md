@@ -40,7 +40,9 @@ brew install frosty-universe/usb-android-tethering/usb-android-tethering
 sudo usb-android-tethering install
 ```
 
-The formula builds from the tagged source with your Rust toolchain, so `brew upgrade` picks up every new release. It is a tap formula, not in homebrew-core, so the fully qualified name is needed the first time.
+The formula builds from the tagged source with your Rust toolchain, so `brew upgrade` picks up every new release. It lives in a [tap](https://github.com/frosty-universe/homebrew-usb-android-tethering), not in homebrew-core, so the fully qualified name is needed the first time. See [docs/HOMEBREW.md](docs/HOMEBREW.md) for upgrading, auditing and how the tap is updated on each release.
+
+`brew services` is not used: the daemon needs root, so `sudo usb-android-tethering install` writes the launchd job and the network service itself. Remove everything with `sudo usb-android-tethering uninstall --purge`.
 
 ---
 
@@ -94,6 +96,33 @@ Phone:              04e8:6863 "SAMSUNG_Android" RNDIS (bus 0 addr 2, ctrl if 0, 
 | VPN clients can run over it | ✅ | ⚠️ often ignored | ✅ |
 | RNDIS **and** CDC-NCM/ECM phones | RNDIS only | varies | ✅ |
 | Auto-connect, crash recovery | ❌ | varies | ✅ |
+
+### Against TetherKit
+
+[TetherKit](https://github.com/XiaoMiku01/TetherKit) is the closest other project: also a
+userspace RNDIS driver on `feth` + BPF with libusb, also no kext. It is a good piece of work,
+and its published benchmark numbers are higher than anything published here. The differences are
+in what surrounds the data path.
+
+| | TetherKit | **usb-android-tethering** |
+|---|---|---|
+| Protocols | RNDIS only | RNDIS, CDC-NCM, CDC-ECM |
+| Network service | `ipconfig set feth0 DHCP`, a temporary service that does not appear in System Settings and does not survive a reboot | A real SystemConfiguration service named "USB Android Tethering", ranked in the service order, DHCP and DNS run by macOS |
+| Routing | Manual default-route change for full-tunnel use | macOS ranks it as a normal adapter, so VPNs pick it up like a dongle |
+| Runs unattended | App or helper must be started; GUI is the primary interface | `launchd` daemon: starts at boot, reconnects on replug |
+| Interface | GUI (SwiftUI) + CLI | CLI only |
+| macOS floor | 14 (GUI), 13.3 (CLI) | 11 |
+| Distribution | Source build; releases arm64-only and unsigned | Universal binary, SHA-256 verified by the installer |
+| Licence | MIT | MIT or Apache-2.0 |
+
+TetherKit's own design notes rule out a persistent network service for `feth`, on the grounds
+that `SCNetworkInterfaceCopyAll()` does not enumerate it. This project reaches the same layer
+by a different route, writing the service into the preferences store with `scutil --prefs`;
+the service is confirmed present and ranked in the order, which is what makes VPN clients treat
+the link as wired Ethernet. That is the main reason to prefer this tool when a VPN is involved.
+
+Neither project has published a head-to-head throughput test on the same phone and link, so
+this README makes no claim about relative speed.
 
 ---
 
@@ -314,6 +343,7 @@ Contributions are very welcome, and **device reports** from phones other than Sa
 - [HoRNDIS](https://github.com/jwise/HoRNDIS), the original macOS RNDIS driver and the inspiration for a generation of tethering tools.
 - Linux's [`rndis_host`](https://github.com/torvalds/linux/blob/master/drivers/net/usb/rndis_host.c) and CDC-NCM drivers, the reference for protocol behaviour.
 - [libusb](https://libusb.info) and [rusb](https://github.com/a1ien/rusb).
+- [TetherKit](https://github.com/XiaoMiku01/TetherKit), a userspace RNDIS driver on the same `feth` + BPF foundation, for showing the approach works and for documenting the parts of the `feth` ABI that are not in any header.
 
 Android is a trademark of Google LLC; macOS is a trademark of Apple Inc. This project is not affiliated with Google, Apple or any phone manufacturer.
 
