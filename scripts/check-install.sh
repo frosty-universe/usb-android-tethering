@@ -1,16 +1,12 @@
 #!/bin/sh
-# Verifies a published release without installing anything: downloads the release asset to a
-# temp dir, checks it against SHA256SUMS, confirms it is universal, and runs `--version`
-# and `--help`.
+# Confirms a release tag's source archive downloads and that Cargo.toml matches the tag.
+# No prebuilt binary is published. Nothing is installed and nothing outside the temp dir is touched.
 #
 #   scripts/check-install.sh              check the latest release
-#   scripts/check-install.sh v0.1.0       check a specific tag
-#
-# No root needed; nothing outside the temp dir is touched. Exit 0 means the release is good.
+#   scripts/check-install.sh v0.2.0       check a specific tag
 set -eu
 
 REPO="frosty-universe/usb-android-tethering"
-ASSET="usb-android-tethering-macos-universal.tar.gz"
 version="${1:-${UAT_VERSION:-}}"
 
 say()  { printf '==> %s\n' "$*"; }
@@ -18,60 +14,43 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 fetch() { curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 -o "$1" "$2"; }
 
 [ "$(uname -s)" = "Darwin" ] || fail "this tool is for macOS only"
-for tool in curl shasum tar awk; do
+for tool in curl tar sed; do
   command -v "$tool" >/dev/null 2>&1 || fail "'$tool' is required but was not found"
 done
 
-if [ -n "$version" ]; then
-  base="https://github.com/$REPO/releases/download/$version"
-else
-  base="https://github.com/$REPO/releases/latest/download"
+case "$version" in
+  "") ;;
+  v[0-9]*) ;;
+  *) fail "version must look like v0.2.0 (got '$version')" ;;
+esac
+
+if [ -z "$version" ]; then
+  say "Finding the latest release"
+  version=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 \
+    "https://api.github.com/repos/$REPO/releases/latest" \
+    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1) \
+    || fail "could not read the latest release"
 fi
+case $version in
+  v[0-9]*) ;;
+  *) fail "could not determine a release tag (got '${version:-}')" ;;
+esac
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-say "Downloading $base/$ASSET"
-fetch "$tmp/$ASSET" "$base/$ASSET" \
-  || fail "download failed: $base/$ASSET"
-fetch "$tmp/SHA256SUMS" "$base/SHA256SUMS" \
-  || fail "checksum download failed: $base/SHA256SUMS"
+url="https://github.com/$REPO/archive/refs/tags/$version.tar.gz"
+say "Downloading $url"
+fetch "$tmp/src.tar.gz" "$url" || fail "download failed: $url"
+tar -xzf "$tmp/src.tar.gz" -C "$tmp" || fail "could not extract the source archive"
+dir="$tmp/usb-android-tethering-${version#v}"
+[ -f "$dir/Cargo.toml" ] || fail "source archive has no Cargo.toml"
+got=$(sed -n 's/^version = "\(.*\)"/\1/p' "$dir/Cargo.toml" | head -1)
+[ -n "$got" ] || fail "Cargo.toml has no version"
+[ "v$got" = "$version" ] || fail "Cargo.toml says $got, tag is $version"
+[ -f "$dir/src/main.rs" ] || fail "source archive has no src/main.rs"
 
-# Match the asset name exactly (awk, not grep: the name is not a regex), accepting a
-# "path/to/asset" second field as well as the plain name.
-want=$(awk -v a="$ASSET" '{ n = $2; sub(/^.*\//, "", n); if (n == a) print $1 }' "$tmp/SHA256SUMS") \
-  || fail "cannot read $tmp/SHA256SUMS"
-[ -n "$want" ] || fail "SHA256SUMS has no line for $ASSET"
-got=$(shasum -a 256 "$tmp/$ASSET" | cut -d' ' -f1)
-[ "$got" = "$want" ] || fail "checksum mismatch for $ASSET
-  expected: $want
-  actual:   $got"
-
-tar -xzf "$tmp/$ASSET" -C "$tmp" usb-android-tethering \
-  || fail "could not extract usb-android-tethering from the tarball"
-chmod 755 "$tmp/usb-android-tethering"
-
-if command -v lipo >/dev/null 2>&1; then
-  archs=$(lipo -archs "$tmp/usb-android-tethering" 2>&1) \
-    || fail "lipo cannot read the binary: $archs"
-  case $archs in *arm64*) ;; *) fail "binary has no arm64 slice (archs: $archs)" ;; esac
-  case $archs in *x86_64*) ;; *) fail "binary has no x86_64 slice (archs: $archs)" ;; esac
-  say "universal: $archs"
-fi
-
-gotver=$("$tmp/usb-android-tethering" --version 2>&1) \
-  || fail "the binary does not run: $gotver"
-[ -n "$gotver" ] || fail "the binary printed nothing for --version"
-if [ -n "$version" ]; then
-  case $gotver in
-    *" ${version#v}"*) ;;
-    *) fail "binary reports '$gotver', expected $version" ;;
-  esac
-fi
-"$tmp/usb-android-tethering" --help >/dev/null 2>&1 \
-  || fail "the binary does not run --help"
-
-say "checksum OK, binary runs: $gotver"
-say "PASS (${version:-latest})"
+say "source archive OK: $version (Cargo.toml $got)"
+say "PASS ($version)"

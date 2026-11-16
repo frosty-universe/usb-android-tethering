@@ -41,7 +41,7 @@ ruby -c /path/to/tap/Formula/usb-android-tethering.rb
 
 ## Why a tap and not homebrew-core
 
-homebrew-core expects a stable, widely used project with its own release cadence and a maintainer who keeps the formula current. A tap has no such bar, updates instantly with each release, and lets users choose `--build-from-source` or the published binary from `install.sh`. If the project grows, submitting to homebrew-core is a later step; the formula here is written to pass `brew audit --strict --new`.
+homebrew-core expects a stable, widely used project with its own release cadence and a maintainer who keeps the formula current. A tap has no such bar and updates with each release. `install.sh` builds the same tagged source when Rust is already installed. If the project grows, submitting to homebrew-core is a later step; the formula here is written to pass `brew audit --strict --new`.
 
 ## How the formula works
 

@@ -54,9 +54,9 @@ It has to run as root: creating network interfaces, opening BPF devices and edit
 - No network sockets, and nothing listens on any port.
 - Only IPv4 and ARP frames are bridged.
 - The optional `adb` helper is never run as root. It runs as the logged-in console user, and only if the binary is owned by root or that user and is not writable by anyone else.
-- The installer verifies the release checksum before running anything.
+- The installer builds the tagged source and checks that the binary reports that version before installing it.
 
-The full model, including file permissions, is in [SECURITY.md](../SECURITY.md). The checksum protects against a corrupted download, not against a compromised release; the source is available and small enough to read.
+The full model, including file permissions, is in [SECURITY.md](../SECURITY.md). Building the tagged source does not protect against a compromised tag; the source is small enough to read.
 
 ## My Pixel or other newer phone uses NCM. Does it need this tool?
 

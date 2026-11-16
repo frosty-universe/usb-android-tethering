@@ -29,10 +29,11 @@ It speaks RNDIS, CDC-NCM and CDC-ECM, so Samsung Galaxy, Google Pixel, Xiaomi, O
 curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh
 ```
 
-This downloads the latest universal binary (Apple Silicon and Intel), **verifies its SHA-256 checksum**, and installs a background service. You'll be asked for your password once. Then [enable USB tethering on your phone](#step-2) and you're online.
+This builds the latest tagged source with Rust (1.88+) and installs a background service. No prebuilt binary is published. You'll be asked for your password once. Then [enable USB tethering on your phone](#step-2) and you're online. [Homebrew](#with-homebrew) builds the same source and installs Rust for you.
 
 <sub>Prefer to read the script first? It's short: <a href="install.sh"><code>install.sh</code></a>. Or <a href="#build-from-source">build from source</a>.</sub>
 
+<a id="with-homebrew"></a>
 ### With Homebrew
 
 ```sh
@@ -71,7 +72,7 @@ Tools that work around this with a *tunnel* interface (`utun`) create a new prob
 - 🔒 **Safe by design.**
   - No kernel code; your Mac's security settings stay as they are.
   - Everything is removed on uninstall.
-  - The installer verifies checksums.
+  - Install builds the tagged source. No prebuilt binary is published.
   - [Security model](SECURITY.md).
 - 🧰 **Scriptable.** `status` and `devices` support `--json`, logs are leveled and rotated, and exit codes are stable.
 
@@ -112,7 +113,7 @@ in what surrounds the data path.
 | Runs unattended | App or helper must be started; GUI is the primary interface | `launchd` daemon: starts at boot, reconnects on replug |
 | Interface | GUI (SwiftUI) + CLI | CLI only |
 | macOS floor | 14 (GUI), 13.3 (CLI) | 11 |
-| Distribution | Source build; releases arm64-only and unsigned | Universal binary, SHA-256 verified by the installer |
+| Distribution | Source build; releases arm64-only and unsigned | Source build via Homebrew or `install.sh`. No prebuilt binary. |
 | Licence | MIT | MIT or Apache-2.0 |
 
 TetherKit's own design notes rule out a persistent network service for `feth`, on the grounds
@@ -212,7 +213,7 @@ The tool needs a Mac that runs macOS 11 or later, and it follows macOS itself: i
 
 Version numbers from [Apple's security releases page](https://support.apple.com/en-us/100100); model lists from [macOS 27 compatibility](https://support.apple.com/en-us/127255).
 
-The universal binary runs natively on both architectures. There is no Apple-silicon-only build and no Rosetta requirement.
+The build is native for the Mac it is compiled on, Apple silicon or Intel. There is no Rosetta requirement, and releases do not attach a binary.
 
 ## 📱 Device support
 
@@ -272,7 +273,7 @@ Nothing else is touched: no kernel extensions, no changes to other network servi
 <details>
 <summary><b>Is it safe? It asks for my password.</b></summary>
 
-Creating a network interface and a system network service needs administrator rights, like any network driver. The tool contains no kernel code, opens no network ports, and runs its optional `adb` helper as your user, never as root. The installer refuses to run anything whose checksum doesn't match the release. The full model is in [SECURITY.md](SECURITY.md).
+Creating a network interface and a system network service needs administrator rights, like any network driver. The tool contains no kernel code, opens no network ports, and runs its optional `adb` helper as your user, never as root. The installer builds the tagged source and refuses to install if that build does not report the release version. The full model is in [SECURITY.md](SECURITY.md).
 </details>
 
 <details>

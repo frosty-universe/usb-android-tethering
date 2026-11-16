@@ -78,8 +78,8 @@ To check performance, run [`scripts/bench.sh`](scripts/bench.sh) before and afte
 
 1. Update the version in `Cargo.toml` and move the **Unreleased** entries in `CHANGELOG.md` under the new version and date.
 2. Run the full check list above, plus an end-to-end test on hardware (install, connect, unplug and replug, `kill -9` recovery, uninstall).
-3. Push a tag `vX.Y.Z`. The *Release* workflow checks it matches `Cargo.toml`, runs the tests, builds the universal binary, and publishes the GitHub release with `SHA256SUMS` and the changelog excerpt as release notes.
-4. Verify the one-command installer against the new release: `curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh`.
+3. Push a tag `vX.Y.Z`. The *Release* workflow checks it matches `Cargo.toml`, runs the tests, and publishes GitHub release notes. It does not upload a binary. When `TAP_TOKEN` is set, it updates the Homebrew formula to that tag.
+4. Verify the source archive with `scripts/check-install.sh vX.Y.Z`, then install with Homebrew or `UAT_VERSION=vX.Y.Z` and `install.sh`. Both build that tag.
 
 ## License
 

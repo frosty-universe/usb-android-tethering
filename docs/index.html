@@ -77,7 +77,7 @@
     {
       "@type": "Question",
       "name": "Is it safe and free?",
-      "acceptedAnswer": { "@type": "Answer", "text": "It is free and open source (MIT or Apache-2.0). It contains no kernel code, opens no network ports, and the installer verifies the release's SHA-256 checksum before installing. Uninstalling removes everything." }
+      "acceptedAnswer": { "@type": "Answer", "text": "It is free and open source (MIT or Apache-2.0). It contains no kernel code and opens no network ports. Releases attach no prebuilt binary: Homebrew, or the install script if Rust is already installed, builds the tagged source. Uninstalling removes everything." }
     }
   ]
 }
@@ -217,7 +217,13 @@
   .copy:hover { filter: brightness(1.08); }
   .copy:active { transform: scale(0.97); }
   .copy svg { width: 16px; height: 16px; }
+  .install-stack { display: grid; gap: 14px; max-width: 760px; margin: 0 auto; text-align: left; }
+  .install-stack .install { max-width: none; margin: 0; }
+  .install-kicker { margin: 0 0 8px 2px; color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .install-note { margin: 14px 0 0; color: var(--faint); font-size: 13.5px; }
+  .table-prose th, .table-prose td { text-align: left; vertical-align: top; }
+  .table-prose tbody th { white-space: nowrap; }
+  .section-lead.follow { margin-top: 22px; }
 
   .cta-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
   .btn {
@@ -406,25 +412,42 @@
       phone into a <strong>real Ethernet adapter</strong>, so your VPN keeps working. No kernel extension.
     </p>
 
-    <div class="install" id="install-box">
-      <div class="install-inner">
-        <code id="install-cmd"><span class="prompt" aria-hidden="true">$</span>curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh</code>
-        <button class="copy" type="button" data-copy="install-cmd" aria-label="Copy install command">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-          <span>Copy</span>
-        </button>
+    <div class="install-stack" id="install-box">
+      <div>
+        <p class="install-kicker">Homebrew</p>
+        <div class="install" id="install-brew">
+          <div class="install-inner">
+            <code id="brew-cmd"><span class="prompt" aria-hidden="true">$</span>brew install frosty-universe/usb-android-tethering/usb-android-tethering &amp;&amp; sudo usb-android-tethering install</code>
+            <button class="copy" type="button" data-copy="brew-cmd" aria-label="Copy Homebrew install command">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="install-kicker">Script, if Rust 1.88+ is installed</p>
+        <div class="install">
+          <div class="install-inner">
+            <code id="install-cmd"><span class="prompt" aria-hidden="true">$</span>curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh</code>
+            <button class="copy" type="button" data-copy="install-cmd" aria-label="Copy source install command">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-    <p class="install-note">Paste into Terminal. It verifies the SHA-256 checksum, then asks for your password once.</p>
+    <p class="install-note">Neither path downloads a prebuilt binary. Homebrew builds the tagged source. The script does the same build when <code>cargo</code> is already on the Mac. macOS asks for your password once, to install the service.</p>
 
     <div class="cta-row">
       <a class="btn primary" href="https://github.com/frosty-universe/usb-android-tethering">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z"/></svg>
         Star on GitHub
       </a>
-      <a class="btn" href="https://github.com/frosty-universe/usb-android-tethering/releases/latest">
+      <a class="btn" href="#install-brew">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
-        Download release
+        Install with Homebrew
       </a>
     </div>
 
@@ -437,9 +460,9 @@
 
     <figure class="terminal reveal" aria-label="Example terminal session">
       <div class="term-bar" aria-hidden="true"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">zsh — usb-android-tethering</span></div>
-<pre class="term-body mono"><span class="t-p">~ ❯</span> <span class="t-c">curl -fsSL …/install.sh | sh</span>
-<span class="t-ok">==&gt;</span> Downloading usb-android-tethering (latest)…
-<span class="t-ok">==&gt;</span> Verifying checksum…
+<pre class="term-body mono"><span class="t-p">~ ❯</span> <span class="t-c">brew install frosty-universe/usb-android-tethering/usb-android-tethering</span>
+<span class="t-ok">==&gt;</span> cargo install --locked <span class="t-m">(tagged source, this Mac's architecture)</span>
+<span class="t-p">~ ❯</span> <span class="t-c">sudo usb-android-tethering install</span>
 <span class="t-ok">==&gt;</span> Installing the background service…
   <span class="t-ok">✔</span> Installed. Plug in your phone and turn on USB tethering.
 
@@ -527,7 +550,7 @@
       <article class="glass feat span-3">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
         <h3>Safe by design</h3>
-        <p>No kernel code and no security changes. The installer checks checksums, and uninstall removes every trace.</p>
+        <p>No kernel code and no security changes. Install builds the tagged source, and uninstall removes every trace.</p>
       </article>
       <article class="glass feat span-3">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6M12 19h8"/></svg></div>
@@ -572,6 +595,33 @@
     </div>
   </section>
 
+  <!-- ===================== TetherKit ===================== -->
+  <section id="tetherkit" class="wrap reveal" aria-labelledby="tetherkit-h">
+    <div class="center">
+      <span class="eyebrow">Same foundation</span>
+      <h2 id="tetherkit-h">Against <a href="https://github.com/XiaoMiku01/TetherKit">TetherKit</a></h2>
+      <p class="section-lead">TetherKit is also a userspace RNDIS driver on <code>feth</code> and BPF, with no kernel extension. The difference is what sits around that data path.</p>
+    </div>
+    <div class="glass table-wrap">
+      <table class="table-prose">
+        <thead>
+          <tr><th scope="col"><span class="sr-only">Point</span></th><th scope="col">TetherKit</th><th scope="col" class="col-us">usb-android-tethering</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Protocols</th><td>RNDIS only</td><td class="col-us">RNDIS, CDC-NCM, CDC-ECM</td></tr>
+          <tr><th scope="row">Network service</th><td><code>ipconfig set feth0 DHCP</code>. Not listed in System Settings. Lost on reboot.</td><td class="col-us">A SystemConfiguration service named "USB Android Tethering". macOS runs DHCP and DNS. It stays in the service order.</td></tr>
+          <tr><th scope="row">Routing</th><td>Manual default-route change for full-tunnel use</td><td class="col-us">macOS ranks it like a dongle, so a VPN can select it as wired Ethernet</td></tr>
+          <tr><th scope="row">Unattended</th><td>The app or helper has to be started. The GUI is the main interface.</td><td class="col-us"><code>launchd</code> starts it at boot and reconnects on replug</td></tr>
+          <tr><th scope="row">Interface</th><td>SwiftUI app and a CLI</td><td class="col-us">CLI only</td></tr>
+          <tr><th scope="row">macOS</th><td>14 for the app, 13.3 for the CLI</td><td class="col-us">11 and later</td></tr>
+          <tr><th scope="row">Install</th><td>Source build. Published releases are arm64-only and unsigned.</td><td class="col-us">Homebrew builds the tagged source. No executable is attached to the release.</td></tr>
+          <tr><th scope="row">Licence</th><td>MIT</td><td class="col-us">MIT or Apache-2.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="section-lead follow">No throughput test on the same phone and link has been published, so this page does not rank speed.</p>
+  </section>
+
   <!-- ===================== FAQ ===================== -->
   <section id="faq" class="wrap reveal" aria-labelledby="faq-h">
     <div class="center">
@@ -588,7 +638,7 @@
       <details class="glass"><summary>Does Android USB tethering work with a VPN on Mac?</summary>
         <p>Yes. usb-android-tethering presents the phone as a genuine Ethernet adapter, which macOS's Network framework reports as wired Ethernet, so VPN apps run over it like over any wired network. Tunnel-based tools create utun interfaces that VPN apps often ignore.</p></details>
       <details class="glass"><summary>Is it safe and free?</summary>
-        <p>It is free and open source (MIT or Apache-2.0). It contains no kernel code, opens no network ports, and the installer verifies the release's SHA-256 checksum before installing. Uninstalling removes everything.</p></details>
+        <p>It is free and open source (MIT or Apache-2.0). It contains no kernel code and opens no network ports. Releases attach no prebuilt binary. Uninstalling removes everything.</p></details>
     </div>
   </section>
 

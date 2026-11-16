@@ -35,7 +35,7 @@ macOS 27, the current release, covers these families: M1, M2, M3, M4, M5 and M6 
 | iMac (2020) | Supported through macOS 26 |
 | Mac Pro (2019) | Supported through macOS 26 |
 
-The release archive contains a **universal binary** (arm64 and x86_64, combined with `lipo`). It runs natively on both architectures: there is no separate Intel build and no Rosetta requirement.
+Releases attach no binary. Homebrew and `install.sh` compile the tagged source for the Mac they run on, Apple silicon or Intel. There is no Rosetta requirement.
 
 ## What the binary needs
 

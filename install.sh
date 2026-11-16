@@ -4,15 +4,15 @@
 #   Install:    curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh
 #   Uninstall:  curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tethering/main/install.sh | sh -s -- --uninstall
 #
-# It downloads the latest release (universal binary: Apple Silicon + Intel), verifies its
-# SHA-256 checksum against the release's SHA256SUMS, and runs `sudo usb-android-tethering
-# install`, which sets up the background service. Nothing is installed if any step fails.
+# No prebuilt binary is published. This downloads the tagged source archive, builds it
+# with cargo (Rust 1.88+), and runs `sudo usb-android-tethering install`.
+# Nothing is installed if any step fails.
 #
-# Environment: UAT_VERSION=v0.1.0 installs a specific release instead of the latest.
+# Environment: UAT_VERSION=v0.2.0 builds that tag instead of the latest release.
+# Homebrew does the same build: brew install frosty-universe/usb-android-tethering/usb-android-tethering
 set -eu
 
 REPO="frosty-universe/usb-android-tethering"
-ASSET="usb-android-tethering-macos-universal.tar.gz"
 BIN="/usr/local/bin/usb-android-tethering"
 
 color() { [ -t "$1" ] && [ -z "${NO_COLOR:-}" ]; }
@@ -21,7 +21,7 @@ fail() { if color 2; then printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; else p
 fetch() { curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 -o "$1" "$2"; }
 
 [ "$(uname -s)" = "Darwin" ] || fail "this tool is for macOS only"
-for tool in curl shasum tar sudo awk; do
+for tool in curl tar sudo awk sed; do
   command -v "$tool" >/dev/null 2>&1 || fail "'$tool' is required but was not found"
 done
 
@@ -36,7 +36,7 @@ case "${1:-}" in
     exit 0
     ;;
   -h|--help)
-    printf 'usage: install.sh [--uninstall]\n\nInstalls usb-android-tethering as a background service.\nUAT_VERSION=v0.1.0 installs a specific release instead of the latest.\n'
+    printf 'usage: install.sh [--uninstall]\n\nBuilds usb-android-tethering from the tagged source and installs the background service.\nRequires Rust 1.88+ (cargo). No prebuilt binary is downloaded.\nUAT_VERSION=v0.2.0 builds that tag instead of the latest release.\n\nHomebrew: brew install frosty-universe/usb-android-tethering/usb-android-tethering\n'
     exit 0
     ;;
   *)
@@ -45,48 +45,59 @@ case "${1:-}" in
 esac
 
 case "${UAT_VERSION:-}" in
-  *[!0-9A-Za-z.+-]*) fail "UAT_VERSION must look like v0.1.0 (got '$UAT_VERSION')" ;;
+  "") ;;
+  v[0-9]*) ;;
+  *) fail "UAT_VERSION must look like v0.2.0 (got '$UAT_VERSION')" ;;
+esac
+case "${UAT_VERSION:-}" in
+  *[!0-9A-Za-z.+-]*) fail "UAT_VERSION must look like v0.2.0 (got '$UAT_VERSION')" ;;
 esac
 
 if [ -n "${UAT_VERSION:-}" ]; then
-  base="https://github.com/$REPO/releases/download/$UAT_VERSION"
+  tag=$UAT_VERSION
 else
-  base="https://github.com/$REPO/releases/latest/download"
+  say "Finding the latest release…"
+  tag=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 \
+    "https://api.github.com/repos/$REPO/releases/latest" \
+    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1) \
+    || fail "could not read the latest release"
 fi
+case $tag in
+  v[0-9]*) ;;
+  *) fail "could not determine a release tag (got '${tag:-}')" ;;
+esac
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-say "Downloading usb-android-tethering ${UAT_VERSION:-(latest)}…"
-fetch "$tmp/$ASSET" "$base/$ASSET" || fail "download failed: $base/$ASSET"
-fetch "$tmp/SHA256SUMS" "$base/SHA256SUMS" || fail "checksum download failed: $base/SHA256SUMS"
+say "Downloading source $tag…"
+fetch "$tmp/src.tar.gz" "https://github.com/$REPO/archive/refs/tags/$tag.tar.gz" \
+  || fail "download failed: https://github.com/$REPO/archive/refs/tags/$tag.tar.gz"
+tar -xzf "$tmp/src.tar.gz" -C "$tmp" \
+  || fail "could not extract the source archive"
+dir="$tmp/usb-android-tethering-${tag#v}"
+[ -f "$dir/Cargo.toml" ] || fail "source archive has no Cargo.toml"
 
-say "Verifying checksum…"
-# Match the asset name exactly (awk, not grep: the name is not a regex), accepting a
-# "path/to/asset" second field as well as the plain name.
-want=$(awk -v a="$ASSET" '{ n = $2; sub(/^.*\//, "", n); if (n == a) print $1 }' "$tmp/SHA256SUMS") \
-  || fail "cannot read $tmp/SHA256SUMS"
-[ -n "$want" ] || fail "SHA256SUMS has no line for $ASSET"
-got=$(shasum -a 256 "$tmp/$ASSET" | cut -d' ' -f1)
-[ "$got" = "$want" ] || fail "checksum mismatch for $ASSET — refusing to install
-  expected: $want
-  actual:   $got"
+command -v cargo >/dev/null 2>&1 || fail "cargo was not found. Install Rust 1.88+ (https://rustup.rs), then run this again.
+  Or install with Homebrew, which builds the same source:
+    brew install frosty-universe/usb-android-tethering/usb-android-tethering
+    sudo usb-android-tethering install"
 
-tar -xzf "$tmp/$ASSET" -C "$tmp" usb-android-tethering \
-  || fail "could not extract usb-android-tethering from $ASSET"
-chmod 755 "$tmp/usb-android-tethering"
-gotver=$("$tmp/usb-android-tethering" --version 2>&1) || fail "downloaded binary does not run on this Mac"
-if [ -n "${UAT_VERSION:-}" ]; then
-  case $gotver in
-    *" ${UAT_VERSION#v}"*) ;;
-    *) fail "downloaded binary reports '$gotver', expected $UAT_VERSION" ;;
-  esac
-fi
+say "Building $tag from source (this can take a few minutes)…"
+( cd "$dir" && cargo build --locked --release ) \
+  || fail "build failed; nothing was installed"
+built="$dir/target/release/usb-android-tethering"
+[ -x "$built" ] || fail "build did not produce usb-android-tethering"
+gotver=$("$built" --version 2>&1) || fail "built binary does not run on this Mac"
+case $gotver in
+  *" ${tag#v}"*) ;;
+  *) fail "built binary reports '$gotver', expected $tag" ;;
+esac
 
 say "Installing the background service (you may be asked for your password)…"
-sudo "$tmp/usb-android-tethering" install \
+sudo "$built" install \
   || fail "install failed; nothing else was changed (run: sudo $BIN install)"
 
 cat <<'EOF'

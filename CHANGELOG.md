@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Releases no longer attach a binary. `install.sh` builds the tagged source with Cargo. Homebrew is unchanged.
+
 ## [0.2.0] - 2026-11-16
 
 ### Changed
@@ -20,10 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `.env.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored; `AGENTS.md` points at `CLAUDE.md`, which `scripts/merge-claude-md.sh` maintains from `scripts/claude-antislop.md` behind a hash guard that never overwrites local edits.
 - docs/COMPATIBILITY.md and docs/FAQ.md.
 - Compatibility pages cite Apple's published latest releases (27.2.1, 26.7.3, 15.8.3, 14.8.9) with a source link, keep the four Intel models that reach macOS 26, and drop the per-chip model matrix: the code depends on no CPU family. Each row now says what was actually verified — end-to-end with a phone on macOS 26, build/unit/smoke tests on macOS 27.2 (A18 Pro MacBook Neo).
-
-### Removed
-
-- `CLAUDE.md.example` and `AGENTS.md.example`. The real files are local and gitignored; the shared instructions live in `scripts/claude-antislop.md`.
 
 ### Fixed
 

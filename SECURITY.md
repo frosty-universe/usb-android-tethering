@@ -46,7 +46,7 @@ The daemon opens **no network sockets** and listens on nothing. It exchanges fra
 
 ### Installer
 
-`install.sh` downloads the release archive and `SHA256SUMS` from the same GitHub release, verifies the archive's SHA-256, extracts only the binary, runs it once with `--version` to prove it executes on this Mac, and only then calls `sudo install`. Any failed step aborts before anything is installed. The archive is not signed by Apple; the checksum only protects against a corrupted or mismatched download, not against a compromised release.
+`install.sh` downloads the tagged source archive, builds it with Cargo, runs the result once with `--version` to prove it matches the tag and executes on this Mac, and only then calls `sudo install`. Any failed step aborts before anything is installed. No prebuilt binary is published. The source archive is not signed; building it locally does not protect against a compromised tag.
 
 ### Files
 
