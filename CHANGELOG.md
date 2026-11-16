@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `scripts/check-install.sh`, a no-root check that downloads a release, verifies its checksum and runs the binary.
 - `.env.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored; `AGENTS.md` points at `CLAUDE.md`, which `scripts/merge-claude-md.sh` maintains from `scripts/claude-antislop.md` behind a hash guard that never overwrites local edits.
 - docs/COMPATIBILITY.md and docs/FAQ.md.
-- Compatibility pages cite Apple's published latest releases (27.2.1, 26.7.3, 15.8.3, 14.8.9) and link the sources, keep the four Intel models that reach macOS 26, and drop the per-chip model matrix: the code depends on no CPU family. macOS 27.2 is verified on this machine (A18 Pro MacBook Neo).
+- Compatibility pages cite Apple's published latest releases (27.2.1, 26.7.3, 15.8.3, 14.8.9) with a source link, keep the four Intel models that reach macOS 26, and drop the per-chip model matrix: the code depends on no CPU family. Each row now says what was actually verified — end-to-end with a phone on macOS 26, build/unit/smoke tests on macOS 27.2 (A18 Pro MacBook Neo).
 
 ### Removed
 
