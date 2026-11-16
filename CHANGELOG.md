@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **Homebrew tap.** `brew install frosty-universe/usb-android-tethering/usb-android-tethering` builds the tagged source. The release workflow updates the tap on every version tag when a `TAP_TOKEN` secret is set. See docs/HOMEBREW.md.
+- **Homebrew tap, live.** `brew install frosty-universe/usb-android-tethering/usb-android-tethering` builds the tagged source from [the published tap](https://github.com/frosty-universe/homebrew-usb-android-tethering); `brew audit --strict --new` passes. The release workflow updates the tap on every version tag when a `TAP_TOKEN` secret is set, and docs/HOMEBREW.md documents the manual path. See docs/HOMEBREW.md.
 - **Installer improvements.** `install.sh` now takes `--help` and `--uninstall`, rejects unknown options, reuses an exact-asset-name checksum match, and prints what failed and what to do next. `UAT_VERSION=vX.Y.Z` still installs a specific release.
 - `scripts/check-install.sh`, a no-root check that downloads a release, verifies its checksum and runs the binary.
 - `.env.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored; `AGENTS.md` points at `CLAUDE.md`, which `scripts/merge-claude-md.sh` maintains from `scripts/claude-antislop.md` behind a hash guard that never overwrites local edits.

@@ -7,21 +7,19 @@ brew install frosty-universe/usb-android-tethering/usb-android-tethering
 sudo usb-android-tethering install
 ```
 
-## One-time setup (maintainers)
+The tap is live at [frosty-universe/homebrew-usb-android-tethering](https://github.com/frosty-universe/homebrew-usb-android-tethering) and carries the formula for v0.1.0. `brew audit --strict --new` passes.
 
-Homebrew requires a tap repository whose name starts with `homebrew-`. Create it once:
+## Updating the formula by hand (maintainers)
 
-```sh
-brew tap-new frosty-universe/usb-android-tethering --no-git
-```
-
-`brew tap-new` creates the repository at `$(brew --repository)/Library/Taps/frosty-universe/homebrew-usb-android-tethering`. Push that directory to GitHub as a new public repository with the same name, then generate the first formula from the current tag:
+The release workflow does this on every tag when `TAP_TOKEN` is set; this is the manual path.
 
 ```sh
-TAP_DIR=/path/to/homebrew-usb-android-tethering scripts/brew/update-tap.sh v0.1.0
+git clone https://github.com/frosty-universe/homebrew-usb-android-tethering
+TAP_DIR=$PWD/homebrew-usb-android-tethering scripts/brew/update-tap.sh vX.Y.Z
+cd homebrew-usb-android-tethering && git add Formula && git commit -m "usb-android-tethering vX.Y.Z" && git push
 ```
 
-Commit and push the generated `Formula/usb-android-tethering.rb`.
+The script downloads the tag's source tarball, computes its SHA-256, writes the formula to a temp file, checks it parses with `ruby -c`, and only then replaces the live one. `--check vX.Y.Z` re-verifies a formula already in place without writing.
 
 ## Automatic updates on every release
 
@@ -30,7 +28,7 @@ Commit and push the generated `Formula/usb-android-tethering.rb`.
 1. Create a fine-grained personal access token with **Contents: Read and write** on the tap repository only.
 2. Add it as `TAP_TOKEN` in the main repository: Settings → Secrets and variables → Actions → New repository secret.
 
-Without the secret the step is skipped and the tap stays at its last version. With it, every tag `vX.Y.Z` updates the formula, so users get the new version with `brew update && brew upgrade`.
+Without the secret the step logs a warning and is skipped, and the tap stays at its last version; use the manual path above until it is set. With it, every tag `vX.Y.Z` updates the formula, so users get the new version with `brew update && brew upgrade`.
 
 ## Checking a formula by hand
 
@@ -49,5 +47,5 @@ homebrew-core expects a stable, widely used project with its own release cadence
 
 - `url` points at the immutable source tarball for the tag, with its SHA-256. No prebuilt binary, so the build always matches the user's architecture and Rust toolchain.
 - `depends_on "rust" => :build` builds from source; libusb is vendored, so there are no runtime dependencies.
-- `service` describes the daemon for `brew services`, with `require_root true` because the network interface needs root. The tool's own `sudo usb-android-tethering install` remains the recommended path, since it also creates the network service entry.
-- `test` runs `--version` and `status`, which need neither root nor a phone.
+- There is no `service` block: `brew services` cannot run the daemon as root, and the tool owns its launchd job anyway. `sudo usb-android-tethering install` writes both the daemon plist and the macOS network service, and the formula's caveats say so.
+- `test` runs `--version` and `--help`, which need neither root nor a phone.
