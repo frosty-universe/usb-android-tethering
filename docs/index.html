@@ -217,8 +217,9 @@
   .copy:hover { filter: brightness(1.08); }
   .copy:active { transform: scale(0.97); }
   .copy svg { width: 16px; height: 16px; }
-  .install-stack { display: grid; gap: 14px; width: 100%; max-width: 760px; min-width: 0; margin: 0 auto; text-align: left; }
-  .install-stack .install { max-width: none; margin: 0; }
+  .install-stack { display: grid; gap: 14px; width: min(760px, 100%); max-width: 100%; min-width: 0; margin: 0 auto; text-align: left; }
+  .install-stack > div { min-width: 0; max-width: 100%; }
+  .install-stack .install { max-width: 100%; margin: 0; }
   .install-kicker { margin: 0 0 8px 2px; color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .install-note { margin: 14px 0 0; color: var(--faint); font-size: 13.5px; }
   .table-prose th, .table-prose td { text-align: left; vertical-align: top; }
