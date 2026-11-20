@@ -14,18 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Dependencies refreshed to the latest releases compatible with the Rust 1.88 minimum: `libc` 0.2.191, `log` 0.4.35, `serde_json` 1.0.154, plus transitive updates.
+- Dependencies refreshed to current releases compatible with the Rust 1.88 minimum: `libc` 0.2.191, `log` 0.4.35, `serde_json` 1.0.154, plus transitive updates.
 - README: Mac compatibility section for macOS 27 Golden Gate, 26 Tahoe, 15 Sequoia and 14 Sonoma, covering Apple silicon and the Intel models those releases still support; star-history chart.
 - Comments: decorative section banners removed and long notes cut to one or two lines. No code changes.
 
 ### Added
 
 - **Homebrew tap, live.** `brew install frosty-universe/usb-android-tethering/usb-android-tethering` builds the tagged source from [the published tap](https://github.com/frosty-universe/homebrew-usb-android-tethering); `brew audit --strict --new` passes. The release workflow updates the tap on every version tag when a `TAP_TOKEN` secret is set, and docs/HOMEBREW.md documents the manual path. See docs/HOMEBREW.md.
-- **Installer improvements.** `install.sh` now takes `--help` and `--uninstall`, rejects unknown options, reuses an exact-asset-name checksum match, and prints what failed and what to do next. `UAT_VERSION=vX.Y.Z` still installs a specific release.
-- `scripts/check-install.sh`, a no-root check that downloads a release, verifies its checksum and runs the binary.
+- **Installer improvements.** `install.sh` now takes `--help` and `--uninstall`, rejects unknown options, builds a selected `UAT_VERSION=vX.Y.Z` from source, and prints actionable failures.
+- `scripts/check-install.sh`, a no-root check that downloads a release source archive and verifies its tag metadata.
 - `.env.example`. The real `.env`, `CLAUDE.md` and `AGENTS.md` are gitignored; `AGENTS.md` points at `CLAUDE.md`, which `scripts/merge-claude-md.sh` maintains from `scripts/claude-antislop.md` behind a hash guard that never overwrites local edits.
 - docs/COMPATIBILITY.md and docs/FAQ.md.
-- Compatibility pages cite Apple's published latest releases (27.2.1, 26.7.3, 15.8.3, 14.8.9) with a source link, keep the four Intel models that reach macOS 26, and drop the per-chip model matrix: the code depends on no CPU family. Each row now says what was actually verified — end-to-end with a phone on macOS 26, build/unit/smoke tests on macOS 27.2 (A18 Pro MacBook Neo).
+- Compatibility pages cite Apple's published latest releases (27.2.1, 26.7.3, 15.8.3, 14.8.9) with source links, keep the four Intel models that reach macOS 26, and separate hardware verification from unit and smoke tests.
 
 ### Fixed
 
@@ -63,8 +63,8 @@ First public release.
 - **Diagnostics.** `status` and `devices` (both with `--json`), and `probe` for testing the link without root. Hints for phones with tethering off, CDC-NCM phones and iPhones.
 - **Optional automatic tethering switch** through `adb` (USB debugging, Android 9+). It alternates between the `rndis` and `ncm` gadget functions, and adb runs as the logged-in console user, never as root.
 - **Logging.** Leveled (`-v`, `-vv`, `-q`), coloured (honours `NO_COLOR`), optional file output with 5 MB rotation.
-- **One-command installer** (`install.sh`). It downloads the latest universal (Apple Silicon + Intel) release, verifies its SHA-256 checksum, and installs the service. `--uninstall` removes everything.
-- **Automated releases.** A version tag builds, tests and publishes a universal binary with SHA256SUMS.
+- **One-command installer** (`install.sh`). It downloads the latest tagged source, builds it for the current Mac, and installs the service. `--uninstall` removes everything.
+- **Automated releases.** A version tag tests and publishes release notes without attaching an executable.
 - **Documentation:** README with a step-by-step guide, architecture, performance methodology, contributing guide, security policy.
 - **Continuous integration** on Apple Silicon and Intel runners and on the minimum supported Rust version (1.88).
 

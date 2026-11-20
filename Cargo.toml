@@ -7,7 +7,6 @@ description = "Android USB (RNDIS) tethering for macOS: userspace driver, native
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/frosty-universe/usb-android-tethering"
-homepage = "https://github.com/frosty-universe/usb-android-tethering"
 keywords = ["macos", "android", "tethering", "rndis", "usb"]
 categories = ["command-line-utilities", "network-programming"]
 # Only what is needed to build and understand the crate goes into a published package.
