@@ -6,9 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-20
+
 ### Changed
 
-- Releases no longer attach a binary. `install.sh` builds the tagged source with Cargo. Homebrew is unchanged.
+- Releases remain source-only. `install.sh` and Homebrew build the tagged source.
+- Root daemon installation uses `/Library/PrivilegedHelperTools`, independent of Homebrew's prefix.
+- Release builds use abort-on-panic for a smaller optimized daemon.
+
+### Fixed
+
+- Hardened BPF, RNDIS, DHCP, ECM framing, service-order validation and shutdown paths.
+- Corrected full-MTU CDC-ECM transmit handling.
+- CI validates every shell script independently.
 
 ## [0.2.0] - 2026-11-16
 
@@ -68,6 +78,7 @@ First public release.
 - **Documentation:** README with a step-by-step guide, architecture, performance methodology, contributing guide, security policy.
 - **Continuous integration** on Apple Silicon and Intel runners and on the minimum supported Rust version (1.88).
 
-[Unreleased]: https://github.com/frosty-universe/usb-android-tethering/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/frosty-universe/usb-android-tethering/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/frosty-universe/usb-android-tethering/releases/tag/v0.2.1
 [0.2.0]: https://github.com/frosty-universe/usb-android-tethering/releases/tag/v0.2.0
 [0.1.0]: https://github.com/frosty-universe/usb-android-tethering/releases/tag/v0.1.0
