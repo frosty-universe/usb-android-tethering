@@ -333,7 +333,7 @@ impl Framing {
                     return (0, 0);
                 }
                 let f = frame(0);
-                if f.len() > *mtu || f.len() + 1 > out.len() {
+                if f.len() > crate::net::ETH_HDR + *mtu || f.len() + 1 > out.len() {
                     return (0, 1);
                 }
                 out[..f.len()].copy_from_slice(f);
