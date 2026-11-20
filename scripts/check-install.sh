@@ -26,10 +26,10 @@ esac
 
 if [ -z "$version" ]; then
   say "Finding the latest release"
-  version=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 \
-    "https://api.github.com/repos/$REPO/releases/latest" \
-    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1) \
+  release_json=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 \
+    "https://api.github.com/repos/$REPO/releases/latest") \
     || fail "could not read the latest release"
+  version=$(printf '%s\n' "$release_json" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
 fi
 case $version in
   v[0-9]*) ;;

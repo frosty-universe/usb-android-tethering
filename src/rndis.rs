@@ -6,6 +6,7 @@
 //! the same interface classes are matched, the same default packet filter is used, and
 //! phones that reject parts of the handshake degrade gracefully instead of failing.
 
+use crate::tether::STOP;
 use anyhow::{Context, Result, bail};
 use rusb::{DeviceHandle, GlobalContext};
 use std::time::Duration;
@@ -26,6 +27,7 @@ const PACKET_HDR_LEN: usize = 44;
 /// Largest transfer we accept from the phone (announced in INITIALIZE); also the RX buffer size.
 pub const HOST_MAX_TRANSFER: u32 = 0x4000;
 const CTRL_TIMEOUT: Duration = Duration::from_secs(1);
+const COMMAND_DEADLINE: Duration = Duration::from_secs(5);
 
 /// Interface class/subclass/protocol triples that identify an RNDIS control interface.
 /// Mirrors the class matches in Linux `drivers/net/usb/rndis_host.c`.
@@ -84,7 +86,10 @@ impl TxLimits {
     ) -> (usize, usize) {
         // One spare byte keeps the transfer off a max-packet boundary (no zero-length packet).
         // `soft` is the smaller of the phone's transfer limit and the buffer.
-        let soft = self.max_xfer.min(out.len()) - 1;
+        let soft = self.max_xfer.min(out.len()).saturating_sub(1);
+        if soft == 0 {
+            return (0, 0);
+        }
         let (mut len, mut used, mut last) = (0, 0, 0);
         for i in 0..count {
             let f = frame(i);
@@ -163,11 +168,21 @@ impl Control<'_> {
         self.next_id = self.next_id.wrapping_add(1).max(1);
         msg[8..12].copy_from_slice(&self.next_id.to_le_bytes());
         let (msg_type, req_id) = (le32(&msg, 0), self.next_id);
+        if STOP.load(std::sync::atomic::Ordering::Relaxed) {
+            bail!("stopping RNDIS command")
+        }
+        let deadline = std::time::Instant::now() + COMMAND_DEADLINE;
         self.h
             .write_control(0x21, 0x00, 0, self.ctrl_if, &msg, CTRL_TIMEOUT)
             .context("RNDIS SEND_ENCAPSULATED_COMMAND")?;
         let mut buf = vec![0u8; 4096];
         for _ in 0..100 {
+            if STOP.load(std::sync::atomic::Ordering::Relaxed) {
+                bail!("stopping RNDIS command")
+            }
+            if std::time::Instant::now() >= deadline {
+                break;
+            }
             // Some devices only answer once their RESPONSE_AVAILABLE notification is read.
             if let Some(ep) = self.int_ep {
                 let mut n = [0u8; 16];

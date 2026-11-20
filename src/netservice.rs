@@ -139,6 +139,13 @@ fn quote(s: &str) -> String {
     out
 }
 
+fn valid_order_id(id: &str) -> bool {
+    !id.is_empty()
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+}
+
 fn parse_service_order(text: &str) -> Vec<String> {
     let mut in_order = false;
     let mut out = Vec::new();
@@ -151,7 +158,10 @@ fn parse_service_order(text: &str) -> Vec<String> {
                 break;
             }
             if let Some((_, id)) = t.split_once(" : ") {
-                out.push(id.trim().to_string());
+                let id = id.trim();
+                if valid_order_id(id) {
+                    out.push(id.to_string());
+                }
             }
         }
     }

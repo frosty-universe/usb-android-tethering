@@ -57,10 +57,10 @@ if [ -n "${UAT_VERSION:-}" ]; then
   tag=$UAT_VERSION
 else
   say "Finding the latest release…"
-  tag=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 \
-    "https://api.github.com/repos/$REPO/releases/latest" \
-    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1) \
+  release_json=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 \
+    "https://api.github.com/repos/$REPO/releases/latest") \
     || fail "could not read the latest release"
+  tag=$(printf '%s\n' "$release_json" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
 fi
 case $tag in
   v[0-9]*) ;;

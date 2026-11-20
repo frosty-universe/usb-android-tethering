@@ -271,17 +271,18 @@ pub enum Framing {
     /// One raw Ethernet frame per transfer.
     Ecm {
         mps: usize,
+        mtu: usize,
     },
 }
 
-const ECM_RX_BUF: usize = 2048;
+const ETHERNET_MTU: usize = 1500;
 
 impl Framing {
     pub fn rx_buf_len(&self) -> usize {
         match self {
             Framing::Rndis(_) => rndis::HOST_MAX_TRANSFER as usize,
             Framing::Ncm(p) => p.rx_buf_len(),
-            Framing::Ecm { .. } => ECM_RX_BUF,
+            Framing::Ecm { mtu, .. } => crate::net::ETH_HDR + mtu + 4,
         }
     }
 
@@ -289,7 +290,7 @@ impl Framing {
         match self {
             Framing::Rndis(l) => l.buf_len(),
             Framing::Ncm(p) => p.tx_buf_len(),
-            Framing::Ecm { .. } => ECM_RX_BUF,
+            Framing::Ecm { mtu, .. } => crate::net::ETH_HDR + mtu + 4,
         }
     }
 
@@ -298,10 +299,20 @@ impl Framing {
         match self {
             Framing::Rndis(_) => rndis::parse_packets(buf, on_frame),
             Framing::Ncm(_) => ncm::parse_ntb(buf, on_frame),
-            Framing::Ecm { .. } => {
+            Framing::Ecm { mtu, .. } => {
                 let mut on_frame = on_frame;
+                let buf = &buf[..buf.len().min(crate::net::ETH_HDR + *mtu + 4)];
                 if buf.len() >= crate::net::ETH_HDR {
-                    on_frame(buf);
+                    let frame = match crate::net::parse_eth(buf) {
+                        Some(eth) if eth.ethertype == crate::net::ETHERTYPE_IPV4 => {
+                            crate::net::trim_ipv4(eth.payload)
+                                .map_or(&buf[..crate::net::ETH_HDR], |payload| {
+                                    &buf[..crate::net::ETH_HDR + payload.len()]
+                                })
+                        }
+                        _ => buf,
+                    };
+                    on_frame(frame);
                 }
             }
         }
@@ -317,12 +328,12 @@ impl Framing {
         match self {
             Framing::Rndis(l) => l.pack_with(count, frame, out),
             Framing::Ncm(p) => p.pack_with(count, frame, out),
-            Framing::Ecm { mps } => {
+            Framing::Ecm { mps, mtu } => {
                 if count == 0 {
                     return (0, 0);
                 }
                 let f = frame(0);
-                if f.len() + 1 > out.len() {
+                if f.len() > *mtu || f.len() + 1 > out.len() {
                     return (0, 1);
                 }
                 out[..f.len()].copy_from_slice(f);
@@ -484,7 +495,10 @@ impl Device {
                         &[],
                         Duration::from_secs(1),
                     );
-                    Framing::Ecm { mps: f.out_mps }
+                    Framing::Ecm {
+                        mps: f.out_mps,
+                        mtu: ETHERNET_MTU,
+                    }
                 };
                 h.set_alternate_setting(f.data_if, f.data_alt)
                     .context("activate the data interface")?;
@@ -739,7 +753,10 @@ mod tests {
 
     #[test]
     fn ecm_pads_to_avoid_zero_length_packets() {
-        let f = Framing::Ecm { mps: 512 };
+        let f = Framing::Ecm {
+            mps: 512,
+            mtu: ETHERNET_MTU,
+        };
         let frame = vec![1u8; 512];
         let mut out = vec![0u8; f.tx_buf_len()];
         assert_eq!(f.pack_with(1, |_| &frame, &mut out), (513, 1));
@@ -750,7 +767,10 @@ mod tests {
 
     #[test]
     fn ecm_drops_an_oversize_frame_without_panicking() {
-        let f = Framing::Ecm { mps: 512 };
+        let f = Framing::Ecm {
+            mps: 512,
+            mtu: ETHERNET_MTU,
+        };
         let big = vec![0u8; 200];
         let mut small = vec![0u8; 100];
         assert_eq!(f.pack_with(1, |_| &big, &mut small), (0, 1));

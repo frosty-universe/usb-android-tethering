@@ -97,7 +97,10 @@ impl Params {
     ) -> (usize, usize) {
         // One spare byte keeps the transfer off a max-packet boundary (no zero-length packet).
         // `soft` is the smaller of the phone's NTB limit and the buffer.
-        let soft = self.out_max.min(out.len()) - 1;
+        let soft = self.out_max.min(out.len()).saturating_sub(1);
+        if soft == 0 {
+            return (0, 0);
+        }
         let mut entries = [(0usize, 0usize); MAX_DATAGRAMS];
         let (mut pos, mut n) = (NTH16_LEN, 0);
         for i in 0..count {

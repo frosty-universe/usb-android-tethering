@@ -187,7 +187,12 @@ impl Feth {
         let fd = (0..256)
             .find_map(|i| {
                 let path = CString::new(format!("/dev/bpf{i}")).ok()?;
-                let fd = unsafe { libc::open(path.as_ptr(), libc::O_RDWR | libc::O_CLOEXEC) };
+                let fd = unsafe {
+                    libc::open(
+                        path.as_ptr(),
+                        libc::O_RDWR | libc::O_CLOEXEC | libc::O_NONBLOCK,
+                    )
+                };
                 (fd >= 0).then(|| unsafe { OwnedFd::from_raw_fd(fd) })
             })
             .context("no free /dev/bpf device")?;

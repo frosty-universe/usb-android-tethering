@@ -172,18 +172,24 @@ pub fn acquire(link: &Link, rx: &Receiver<Vec<u8>>) -> Result<Lease> {
         let Some(offer) = wait(link, rx, xid, &[OFFER]) else {
             continue;
         };
-        let server = addr(&offer.opts, 54).unwrap_or(Ipv4Addr::UNSPECIFIED);
-        log::debug!("DHCP offer {} from {server}", offer.yiaddr);
-        let extra = [
-            (50, offer.yiaddr.octets().to_vec()),
-            (54, server.octets().to_vec()),
-        ];
+        let server = addr(&offer.opts, 54);
+        log::debug!(
+            "DHCP offer {} from {}",
+            offer.yiaddr,
+            server.unwrap_or(Ipv4Addr::UNSPECIFIED)
+        );
+        let mut extra = vec![(50, offer.yiaddr.octets().to_vec())];
+        if let Some(server) = server {
+            extra.push((54, server.octets().to_vec()));
+        }
         broadcast(
             link,
             &build(REQUEST, xid, link.mac, Ipv4Addr::UNSPECIFIED, &extra),
         )?;
         match wait(link, rx, xid, &[ACK, NAK]) {
-            Some(r) if r.msg_type == ACK => return lease_from(&r, server),
+            Some(r) if r.msg_type == ACK => {
+                return lease_from(&r, server.unwrap_or(Ipv4Addr::UNSPECIFIED));
+            }
             Some(_) => log::debug!("DHCP NAK, restarting"),
             None => {}
         }

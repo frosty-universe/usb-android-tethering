@@ -444,8 +444,12 @@ fn main() -> ExitCode {
         Cmd::Uninstall { purge } => cmd_uninstall(purge),
         Cmd::Cleanup => cmd_cleanup(),
         Cmd::Guard { pid } => {
-            guard::run(pid);
-            true
+            if !require_root("__guard") {
+                false
+            } else {
+                guard::run(pid);
+                true
+            }
         }
     };
     if ok {
