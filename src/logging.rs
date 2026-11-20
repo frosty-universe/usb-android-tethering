@@ -23,8 +23,7 @@ struct Logger {
     rotate_error_reported: AtomicBool,
 }
 
-/// Keep one record per line and let no terminal control through: product strings and error
-/// text from an attached phone reach the log unsanitised.
+/// Keep one record per line and escape terminal control characters from phone-supplied text.
 fn sanitize(msg: &str) -> Cow<'_, str> {
     if !msg.chars().any(|c| c.is_control() && c != '\t') {
         return Cow::Borrowed(msg);

@@ -54,7 +54,7 @@ fn build(
     cid.extend_from_slice(&mac);
     m.extend_from_slice(&[61, cid.len() as u8]);
     m.extend_from_slice(&cid);
-    // subnet, router, DNS, MTU, lease, server id, T1, T2
+    // Request the options used to build the lease.
     m.extend_from_slice(&[55, 8, 1, 3, 6, 26, 51, 54, 58, 59]);
     for (code, val) in extra {
         m.extend_from_slice(&[*code, val.len() as u8]);

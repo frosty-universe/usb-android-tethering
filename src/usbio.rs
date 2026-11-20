@@ -17,7 +17,7 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, Once};
 use std::time::{Duration, Instant};
 
-// Event thread + hotplug
+// USB event handling
 
 static CHANGES: Mutex<u64> = Mutex::new(0);
 static CHANGED: Condvar = Condvar::new();
