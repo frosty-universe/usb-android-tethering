@@ -3,7 +3,7 @@
 # No prebuilt binary is published. Nothing is installed and nothing outside the temp dir is touched.
 #
 #   scripts/check-install.sh              check the latest release
-#   scripts/check-install.sh v0.2.0       check a specific tag
+#   scripts/check-install.sh vX.Y.Z       check a specific tag
 set -eu
 
 REPO="frosty-universe/usb-android-tethering"
@@ -21,7 +21,7 @@ done
 case "$version" in
   "") ;;
   v[0-9]*) ;;
-  *) fail "version must look like v0.2.0 (got '$version')" ;;
+  *) fail "version must look like vX.Y.Z (got '$version')" ;;
 esac
 
 if [ -z "$version" ]; then

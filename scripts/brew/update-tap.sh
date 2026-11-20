@@ -2,8 +2,8 @@
 # Points the Homebrew tap at a published release: downloads the source tarball for a tag,
 # computes its SHA-256 and writes Formula/usb-android-tethering.rb into a tap checkout.
 #
-#   scripts/brew/update-tap.sh v0.2.0            write the formula
-#   scripts/brew/update-tap.sh --check v0.2.0    validate the formula already there, write nothing
+#   scripts/brew/update-tap.sh vX.Y.Z            write the formula
+#   scripts/brew/update-tap.sh --check vX.Y.Z    validate the formula already there, write nothing
 #
 # TAP_DIR defaults to a sibling checkout of the tap repository. --check runs `ruby -c` on the
 # formula and confirms its sha256/url match the real release tarball; exit 1 on any mismatch.

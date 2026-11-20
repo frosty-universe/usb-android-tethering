@@ -8,7 +8,7 @@
 # with cargo (Rust 1.88+), and runs `sudo usb-android-tethering install`.
 # Nothing is installed if any step fails.
 #
-# Environment: UAT_VERSION=v0.2.0 builds that tag instead of the latest release.
+# Environment: UAT_VERSION=vX.Y.Z builds that tag instead of the latest release.
 # Homebrew does the same build: brew install frosty-universe/usb-android-tethering/usb-android-tethering
 set -eu
 
@@ -36,7 +36,7 @@ case "${1:-}" in
     exit 0
     ;;
   -h|--help)
-    printf 'usage: install.sh [--uninstall]\n\nBuilds usb-android-tethering from the tagged source and installs the background service.\nRequires Rust 1.88+ (cargo). No prebuilt binary is downloaded.\nUAT_VERSION=v0.2.0 builds that tag instead of the latest release.\n\nHomebrew: brew install frosty-universe/usb-android-tethering/usb-android-tethering\n'
+    printf 'usage: install.sh [--uninstall]\n\nBuilds usb-android-tethering from the tagged source and installs the background service.\nRequires Rust 1.88+ (cargo). No prebuilt binary is downloaded.\nUAT_VERSION=vX.Y.Z builds that tag instead of the latest release.\n\nHomebrew: brew install frosty-universe/usb-android-tethering/usb-android-tethering\n'
     exit 0
     ;;
   *)
@@ -47,10 +47,10 @@ esac
 case "${UAT_VERSION:-}" in
   "") ;;
   v[0-9]*) ;;
-  *) fail "UAT_VERSION must look like v0.2.0 (got '$UAT_VERSION')" ;;
+  *) fail "UAT_VERSION must look like vX.Y.Z (got '$UAT_VERSION')" ;;
 esac
 case "${UAT_VERSION:-}" in
-  *[!0-9A-Za-z.+-]*) fail "UAT_VERSION must look like v0.2.0 (got '$UAT_VERSION')" ;;
+  *[!0-9A-Za-z.+-]*) fail "UAT_VERSION must look like vX.Y.Z (got '$UAT_VERSION')" ;;
 esac
 
 if [ -n "${UAT_VERSION:-}" ]; then
