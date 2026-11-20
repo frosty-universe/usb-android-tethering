@@ -44,7 +44,7 @@ curl -fsSL https://raw.githubusercontent.com/frosty-universe/usb-android-tetheri
 
 That runs `sudo usb-android-tethering uninstall --purge`, which stops and removes the launchd job, deletes the plist and the binary, removes the network service from every network location, and deletes the log. The `feth` interfaces only exist while connected, so there is nothing else to remove.
 
-If you built from source, run `sudo /usr/local/bin/usb-android-tethering uninstall --purge`.
+If you built from source, run `sudo /Library/PrivilegedHelperTools/usb-android-tethering uninstall --purge`.
 
 ## Is it safe to run as root?
 

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 pub const LABEL: &str = "com.usb-android-tethering";
 pub const PLIST: &str = "/Library/LaunchDaemons/com.usb-android-tethering.plist";
-pub const BIN: &str = "/usr/local/bin/usb-android-tethering";
+pub const BIN: &str = "/Library/PrivilegedHelperTools/usb-android-tethering";
 pub const LOG: &str = "/var/log/usb-android-tethering.log";
 
 fn launchctl(args: &[&str]) -> Result<()> {
@@ -117,7 +117,6 @@ fn set_root_owned(path: &Path) -> Result<()> {
 /// mid-install never sees a half-written file.
 fn install_binary(exe: &Path) -> Result<()> {
     let dir = Path::new(BIN).parent().expect("BIN has a parent");
-    std::fs::create_dir_all(dir).with_context(|| format!("create {}", dir.display()))?;
     check_dir(dir)?;
     let tmp = format!("{BIN}.new");
     std::fs::copy(exe, &tmp).with_context(|| format!("copy binary to {BIN}"))?;

@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Dependencies refreshed to current releases compatible with the Rust 1.88 minimum: `libc` 0.2.191, `log` 0.4.35, `serde_json` 1.0.154, plus transitive updates.
-- README: Mac compatibility section for macOS 27 Golden Gate, 26 Tahoe, 15 Sequoia and 14 Sonoma, covering Apple silicon and the Intel models those releases still support; star-history chart.
+- README: concise macOS compatibility and install guidance for Apple silicon and supported Intel Macs.
 - Comments: decorative section banners removed and long notes cut to one or two lines. No code changes.
 
 ### Added
@@ -68,5 +68,6 @@ First public release.
 - **Documentation:** README with a step-by-step guide, architecture, performance methodology, contributing guide, security policy.
 - **Continuous integration** on Apple Silicon and Intel runners and on the minimum supported Rust version (1.88).
 
-[Unreleased]: https://github.com/frosty-universe/usb-android-tethering/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/frosty-universe/usb-android-tethering/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/frosty-universe/usb-android-tethering/releases/tag/v0.2.0
 [0.1.0]: https://github.com/frosty-universe/usb-android-tethering/releases/tag/v0.1.0

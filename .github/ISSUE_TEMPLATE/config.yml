@@ -10,5 +10,5 @@ contact_links:
     url: https://github.com/frosty-universe/usb-android-tethering/blob/main/SECURITY.md
     about: What runs as root, the trust boundaries and how to report a problem privately.
   - name: Troubleshooting guide
-    url: https://github.com/frosty-universe/usb-android-tethering#troubleshooting
+    url: https://github.com/frosty-universe/usb-android-tethering/blob/main/docs/FAQ.md
     about: Common problems and fixes

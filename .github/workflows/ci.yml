@@ -55,7 +55,9 @@ jobs:
 
       - name: Validate packaging scripts
         run: |
-          sh -n install.sh scripts/check-install.sh scripts/brew/update-tap.sh
+          for script in install.sh scripts/check-install.sh scripts/brew/update-tap.sh scripts/bench.sh scripts/merge-claude-md.sh; do
+            sh -n "$script"
+          done
           sh install.sh --help > /dev/null
 
       - name: Build (release)

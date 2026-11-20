@@ -52,12 +52,12 @@ The daemon opens **no network sockets** and listens on nothing. It exchanges fra
 
 | Path | Owner / mode | Notes |
 |---|---|---|
-| `/usr/local/bin/usb-android-tethering` | `root:wheel 0755` | Set explicitly before the binary is renamed into place, so no other user can replace code that runs as root. The installer also refuses to install into a directory that is not root-owned or that is group- or world-writable. |
+| `/Library/PrivilegedHelperTools/usb-android-tethering` | `root:wheel 0755` | Set explicitly before the binary is renamed into place. The directory is a root-owned system location, never a Homebrew prefix. |
 | `/Library/LaunchDaemons/com.usb-android-tethering.plist` | root, `0644` (process umask) | Written by the installer running as root. |
-| `/var/run/usb-android-tethering.json` | root, `0644` (process umask) | Status only (addresses, counters). No secrets. Replaced atomically. |
+| `/var/run/usb-android-tethering.json` | root, `0644` (explicit) | Status only (addresses, counters). No secrets. Replaced atomically. |
 | `/var/log/usb-android-tethering.log` | root, `0644` (process umask) | Contains no traffic contents. Rotated to `.log.1` at 5 MB. |
 
-The two `0644` entries are ordinary files created by a root process with the default umask, not modes the code sets explicitly. If you run the daemon with a restrictive umask they will be more restrictive, never less.
+The plist and log are ordinary files created by a root process with the default umask. The status file sets `0644` explicitly. A restrictive umask makes the implicit modes more restrictive, never less.
 
 ### Network exposure
 

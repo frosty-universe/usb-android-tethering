@@ -13,7 +13,7 @@
 set -eu
 
 REPO="frosty-universe/usb-android-tethering"
-BIN="/usr/local/bin/usb-android-tethering"
+BIN="/Library/PrivilegedHelperTools/usb-android-tethering"
 
 color() { [ -t "$1" ] && [ -z "${NO_COLOR:-}" ]; }
 say()  { if color 1; then printf '\033[1;32m==>\033[0m %s\n' "$*"; else printf '==> %s\n' "$*"; fi; }
@@ -98,7 +98,7 @@ esac
 
 say "Installing the background service (you may be asked for your password)…"
 sudo "$built" install \
-  || fail "install failed; nothing else was changed (run: sudo $BIN install)"
+  || fail "service install failed; the binary at $BIN may have been updated"
 
 cat <<'EOF'
 

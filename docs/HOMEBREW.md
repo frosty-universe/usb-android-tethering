@@ -7,7 +7,7 @@ brew install frosty-universe/usb-android-tethering/usb-android-tethering
 sudo usb-android-tethering install
 ```
 
-The tap is live at [frosty-universe/homebrew-usb-android-tethering](https://github.com/frosty-universe/homebrew-usb-android-tethering) and carries the formula for v0.1.0. `brew audit --strict --new` passes.
+The tap is live at [frosty-universe/homebrew-usb-android-tethering](https://github.com/frosty-universe/homebrew-usb-android-tethering) and carries the formula for the current release. `brew audit --strict --new` passes.
 
 ## Updating the formula by hand (maintainers)
 
@@ -33,7 +33,7 @@ The secret is not set yet, so the step logs a warning and skips; update the tap 
 ## Checking a formula by hand
 
 ```sh
-TAP_DIR=/path/to/tap scripts/brew/update-tap.sh --check v0.1.0   # verify only, no writes
+TAP_DIR=/path/to/tap scripts/brew/update-tap.sh --check vX.Y.Z   # verify only, no writes
 ruby -c /path/to/tap/Formula/usb-android-tethering.rb
 ```
 

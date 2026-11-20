@@ -19,7 +19,7 @@ label=${1:-bench}
 bytes=${2:-30000000}
 status_file=/var/run/usb-android-tethering.json
 
-pid=$(pgrep -fl usb-android-tethering | grep -v -- '__guard' | awk 'NR==1{print $1}')
+pid=$(pgrep -fl usb-android-tethering | grep -v -- '__guard' | awk 'NR==1{print $1}') || pid=""
 if [[ -z "$pid" || ! -r "$status_file" ]]; then
   print -u2 "no online usb-android-tethering instance found"
   exit 1

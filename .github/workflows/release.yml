@@ -29,7 +29,10 @@ jobs:
           test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != Cargo.toml v$version"; exit 1; }
 
       - name: Validate packaging scripts
-        run: sh -n install.sh scripts/check-install.sh scripts/brew/update-tap.sh
+        run: |
+          for script in install.sh scripts/check-install.sh scripts/brew/update-tap.sh; do
+            sh -n "$script"
+          done
 
       - name: Test
         run: cargo test --locked
